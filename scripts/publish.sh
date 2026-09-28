@@ -82,7 +82,7 @@ restart_log="$HOME/.codex/log/customized-daemon-restart.log"
 mkdir -p "$(dirname "$restart_log")"
 (
     cd "$HOME/Code"
-    nohup python3 "$script_dir/finish-build.py" "${finish_args[@]}" \
+    nohup "$script_dir/finish-build.sh" "${finish_args[@]}" \
         </dev/null >"$restart_log" 2>&1 &
 )
 echo "Completion task started; final COMPLETE, FAILED, or TIMEOUT result: $restart_log"

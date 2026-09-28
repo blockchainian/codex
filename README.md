@@ -8,7 +8,6 @@ contain a copy of the upstream source or upstream commit history.
 AGENTS.md        Instructions for this repository
 patches/         Ordered personal patches
 scripts/         Build, publish, and development tools
-tests/           Workflow regression tests
 official/        Pinned OpenAI Codex submodule
 ```
 
@@ -30,8 +29,8 @@ the latest stable official release tag, and builds three release binaries using
 `official/codex-rs/target` as the shared cache. Outputs are copied to
 `~/.local/share/codex-customized/bin` and the existing installation links updated.
 
-A detached completion task restarts the managed daemon once if binaries or links
-changed, then restores the dedicated build source to its original commit. It
+A detached `scripts/finish-build.sh` task restarts the managed daemon once if
+binaries or links changed, then restores the dedicated build source to its original commit. It
 does not remove build caches or development worktrees. The restart has a
 120-second deadline. Check the final result:
 
@@ -99,13 +98,12 @@ in a fresh worktree before publishing.
 For an existing patch, recreate its preceding patch baseline and amend that
 patch; avoid adding a patch that simply undoes another patch.
 
-## Script tests
+## Checks
 
 ```sh
 for script in scripts/*.sh; do bash -n "$script"; done
-python3 -m unittest discover -s tests
 ./scripts/check-patches.sh
 ```
 
-These checks cover workflow behavior and patch applicability. They do not replace
+These checks cover Shell syntax and patch applicability. They do not replace
 the relevant upstream tests or a release build for changed Codex behavior.

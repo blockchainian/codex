@@ -20,7 +20,7 @@
 - Successful publication cleans only the dedicated build worktree, after a
   successful daemon restart when binaries or links changed. Failures preserve
   diagnostic state. Never use broad cleanup against a development worktree.
-- Verify script changes by running `bash -n` on each `scripts/*.sh` file and
-  `python3 -m unittest discover -s tests`. Verify the stack with
-  `scripts/check-patches.sh`; run relevant upstream tests for behavior changes.
+- Verify script changes by running `bash -n` on each `scripts/*.sh` file.
+  Verify patch changes with `scripts/check-patches.sh`; run relevant upstream
+  tests for changed Codex behavior. Keep this patch repository's checks minimal.
 - Commit each coherent verified change and push it to this repository.
