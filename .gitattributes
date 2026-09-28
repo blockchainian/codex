@@ -1,0 +1,2 @@
+# Empty context lines in raw Git patches deliberately contain one space.
+patches/*.patch -whitespace

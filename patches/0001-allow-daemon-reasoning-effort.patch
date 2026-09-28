@@ -1,0 +1,12 @@
+diff --git a/codex-rs/tui/src/daemon_startup.rs b/codex-rs/tui/src/daemon_startup.rs
+index 9ce454fc9e..5f15e8d28a 100644
+--- a/codex-rs/tui/src/daemon_startup.rs
++++ b/codex-rs/tui/src/daemon_startup.rs
+@@ -59,6 +59,7 @@ pub(super) fn config_exclusion(
+     if !cli_kv_overrides
+         .iter()
+         .all(|(key, value)| match key.as_str() {
++            "model_reasoning_effort" => value.is_str(),
+             "suppress_unstable_features_warning" | "tui.fullscreen_transcript" => value.is_bool(),
+             "tui" => value.as_table().is_some_and(|tui| {
+                 tui.len() == 1

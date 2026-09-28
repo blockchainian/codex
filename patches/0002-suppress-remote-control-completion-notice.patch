@@ -1,0 +1,19 @@
+diff --git a/codex-rs/app-server/src/request_processors/initialize_processor.rs b/codex-rs/app-server/src/request_processors/initialize_processor.rs
+index d68a29df9f..3117fe410c 100644
+--- a/codex-rs/app-server/src/request_processors/initialize_processor.rs
++++ b/codex-rs/app-server/src/request_processors/initialize_processor.rs
+@@ -134,7 +134,13 @@ impl InitializeRequestProcessor {
+         if session
+             .initialize(InitializedConnectionSessionState {
+                 experimental_api_enabled,
+-                opted_out_notification_methods: opt_out_notification_methods.into_iter().collect(),
++                opted_out_notification_methods: opt_out_notification_methods
++                    .into_iter()
++                    .chain(
++                        (session.origin == ConnectionOrigin::RemoteControl)
++                            .then(|| "turn/completed".to_string()),
++                    )
++                    .collect(),
+                 app_server_client_name: name.clone(),
+                 client_version: version,
+                 request_attestation,

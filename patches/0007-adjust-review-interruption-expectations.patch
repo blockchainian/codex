@@ -1,0 +1,33 @@
+diff --git a/codex-rs/tui/src/chatwidget/tests/review_mode.rs b/codex-rs/tui/src/chatwidget/tests/review_mode.rs
+index 2806de703f..dc148c6673 100644
+--- a/codex-rs/tui/src/chatwidget/tests/review_mode.rs
++++ b/codex-rs/tui/src/chatwidget/tests/review_mode.rs
+@@ -1231,11 +1231,9 @@ async fn interrupted_turn_error_message_snapshot() {
+ 
+     let cells = drain_insert_history(&mut rx);
+     assert!(
+-        !cells.is_empty(),
+-        "expected error message to be inserted after interruption"
++        cells.is_empty(),
++        "interrupting a turn should not insert a history message"
+     );
+-    let last = lines_to_single_string(cells.last().unwrap());
+-    assert_chatwidget_snapshot!("interrupted_turn_error_message", last);
+ }
+ 
+ #[tokio::test]
+@@ -1355,9 +1353,11 @@ async fn interrupted_turn_pending_steers_message_snapshot() {
+     let info = cells
+         .iter()
+         .map(|cell| lines_to_single_string(cell))
+-        .find(|line| line.contains("Model interrupted to submit steer instructions."))
+-        .expect("expected steer interrupt info message to be inserted");
+-    assert_chatwidget_snapshot!("interrupted_turn_pending_steers_message", info);
++        .find(|line| line.contains("Model interrupted to submit steer instructions."));
++    assert!(
++        info.is_none(),
++        "interrupting with pending steers should not insert an interrupt banner"
++    );
+ }
+ 
+ /// Opening custom prompt from the review popup, pressing Esc returns to the

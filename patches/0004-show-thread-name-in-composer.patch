@@ -1,0 +1,64 @@
+diff --git a/codex-rs/tui/src/bottom_pane/chat_composer.rs b/codex-rs/tui/src/bottom_pane/chat_composer.rs
+index c7655c0b58..f0b945f2b4 100644
+--- a/codex-rs/tui/src/bottom_pane/chat_composer.rs
++++ b/codex-rs/tui/src/bottom_pane/chat_composer.rs
+@@ -4907,6 +4907,23 @@ impl ChatComposer {
+             let style = Style::default().dim();
+             buf.set_string(composer_rect.x, composer_rect.y, &rule, style);
+             buf.set_string(composer_rect.x, composer_rect.bottom() - 1, &rule, style);
++            if composer_rect.width > 4
++                && let Some(name) = options.thread_name.filter(|name| !name.is_empty())
++            {
++                let mut label = truncate_line_with_ellipsis_if_overflow(
++                    Line::from(name.to_owned()),
++                    usize::from(composer_rect.width - 4),
++                );
++                label.spans.insert(0, " ".into());
++                label.spans.push(" ".into());
++                let width = label.width() as u16;
++                buf.set_line(
++                    composer_rect.right() - width - 1,
++                    composer_rect.y,
++                    &label,
++                    width,
++                );
++            }
+         }
+         if !remote_images_rect.is_empty() {
+             (&Paragraph::new(self.attachments.remote_image_lines()))
+diff --git a/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs b/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
+index c734ccad7d..aa486dfd54 100644
+--- a/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
++++ b/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
+@@ -63,6 +63,7 @@ pub(crate) enum CommandPopupPlacement {
+ /// A borrowed presentation shared by measurement, painting, and cursor placement.
+ #[derive(Clone, Copy, Default)]
+ pub(crate) struct ComposerRenderOptions<'a> {
++    pub(crate) thread_name: Option<&'a str>,
+     /// Reserve a shared hint row independently of whether it currently contains a notice.
+     pub(crate) composer_gap: Option<&'a crate::bottom_pane::ComposerGap>,
+     pub(crate) working_tip: Option<&'a crate::turn_tip::TurnTip>,
+diff --git a/codex-rs/tui/src/bottom_pane/mod.rs b/codex-rs/tui/src/bottom_pane/mod.rs
+index 87ab81d313..abdcd156ef 100644
+--- a/codex-rs/tui/src/bottom_pane/mod.rs
++++ b/codex-rs/tui/src/bottom_pane/mod.rs
+@@ -2312,6 +2312,7 @@ impl BottomPane {
+             let composer: RenderableItem<'_> = if let Some(questions) = question_editor {
+                 RenderableItem::Borrowed(questions.as_ref())
+             } else if options.textarea_right_reserve == 0
++                && options.thread_name.is_none()
+                 && options.warning_count == 0
+                 && options.footer.is_none()
+                 && !options.separate_status_line
+diff --git a/codex-rs/tui/src/chatwidget/rendering.rs b/codex-rs/tui/src/chatwidget/rendering.rs
+index 345146fadb..4111847513 100644
+--- a/codex-rs/tui/src/chatwidget/rendering.rs
++++ b/codex-rs/tui/src/chatwidget/rendering.rs
+@@ -243,6 +243,7 @@ impl ChatWidget {
+             };
+             self.bottom_pane
+                 .as_renderable_with_options(crate::bottom_pane::ComposerRenderOptions {
++                    thread_name: self.thread_name.as_deref(),
+                     composer_gap,
+                     working_tip,
+                     warning_count: self.warning_display_state.count,

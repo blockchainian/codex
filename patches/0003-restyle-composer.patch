@@ -1,0 +1,95 @@
+diff --git a/codex-rs/tui/src/bottom_pane/chat_composer.rs b/codex-rs/tui/src/bottom_pane/chat_composer.rs
+index ff4e78b37a..c7655c0b58 100644
+--- a/codex-rs/tui/src/bottom_pane/chat_composer.rs
++++ b/codex-rs/tui/src/bottom_pane/chat_composer.rs
+@@ -372,7 +372,6 @@ use crate::render::Insets;
+ use crate::render::RectExt;
+ use crate::render::renderable::Renderable;
+ use crate::slash_command::SlashCommand;
+-use crate::style::user_message_style;
+ use codex_protocol::ThreadId;
+ use codex_protocol::user_input::ByteRange;
+ use codex_protocol::user_input::MAX_USER_INPUT_TEXT_CHARS;
+@@ -4902,12 +4901,16 @@ impl ChatComposer {
+         if let Some((warning_area, line)) = warning_notice {
+             line.render(warning_area, buf);
+         }
+-        let style = user_message_style();
+-        Block::default().style(style).render(composer_rect, buf);
++        (&Block::default()).render_ref(composer_rect, buf);
++        if composer_rect.height > 0 {
++            let rule = "─".repeat(composer_rect.width as usize);
++            let style = Style::default().dim();
++            buf.set_string(composer_rect.x, composer_rect.y, &rule, style);
++            buf.set_string(composer_rect.x, composer_rect.bottom() - 1, &rule, style);
++        }
+         if !remote_images_rect.is_empty() {
+-            Paragraph::new(self.attachments.remote_image_lines())
+-                .style(style)
+-                .render(remote_images_rect, buf);
++            (&Paragraph::new(self.attachments.remote_image_lines()))
++                .render_ref(remote_images_rect, buf);
+         }
+         if !textarea_rect.is_empty() {
+             let prompt = if self.draft.input_enabled {
+@@ -4915,7 +4918,7 @@ impl ChatComposer {
+                     Span::from("!").light_red().bold()
+                 } else if self.luna_reserve_active {
+                     // Reserve keeps one arrow at every reasoning effort; only its foreground changes.
+-                    "›"
++                    "❯"
+                         .fg(crate::terminal_palette::best_color((246, 197, 67)))
+                         .bold()
+                 } else if let Some(tier) = self.effort_tier {
+@@ -4926,10 +4929,10 @@ impl ChatComposer {
+                         .unwrap_or(1.0);
+                     tier.prompt(charge)
+                 } else {
+-                    "›".bold()
++                    "❯".bold()
+                 }
+             } else {
+-                "›".dim()
++                "❯".dim()
+             };
+             buf.set_span(
+                 textarea_rect.x - LIVE_PREFIX_COLS,
+diff --git a/codex-rs/tui/src/bottom_pane/chat_composer/inline_input.rs b/codex-rs/tui/src/bottom_pane/chat_composer/inline_input.rs
+index 9022ab4f77..63cc57c8fc 100644
+--- a/codex-rs/tui/src/bottom_pane/chat_composer/inline_input.rs
++++ b/codex-rs/tui/src/bottom_pane/chat_composer/inline_input.rs
+@@ -5,6 +5,7 @@
+ 
+ use super::super::textarea::VimPersistentState;
+ use super::*;
++use crate::style::user_message_style;
+ 
+ impl ComposerDraft {
+     pub(in crate::bottom_pane) fn text_with_pending(&self) -> String {
+diff --git a/codex-rs/tui/src/bottom_pane/effort_ignition.rs b/codex-rs/tui/src/bottom_pane/effort_ignition.rs
+index 56658fcaf9..29e813295e 100644
+--- a/codex-rs/tui/src/bottom_pane/effort_ignition.rs
++++ b/codex-rs/tui/src/bottom_pane/effort_ignition.rs
+@@ -102,13 +102,6 @@ impl EffortTier {
+         }
+     }
+ 
+-    fn prompt_glyph(self) -> &'static str {
+-        match self {
+-            Self::Max => "›",
+-            Self::Ultra => "»",
+-        }
+-    }
+-
+     pub(super) fn hues(self, on_light_bg: bool) -> [(u8, u8, u8); 3] {
+         match (self, on_light_bg) {
+             (Self::Max, false) => [(255, 178, 66), (255, 214, 120), (255, 120, 60)],
+@@ -150,7 +143,7 @@ impl EffortTier {
+         if let Some(color) = color {
+             style = style.fg(color);
+         }
+-        Span::styled(self.prompt_glyph(), style)
++        Span::styled("❯", style)
+     }
+ 
+     fn accent_color_for(

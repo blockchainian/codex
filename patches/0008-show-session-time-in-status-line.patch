@@ -1,0 +1,232 @@
+diff --git a/codex-rs/codex-api/src/sse/responses.rs b/codex-rs/codex-api/src/sse/responses.rs
+index c01b13f1fe..6721d1d4c8 100644
+--- a/codex-rs/codex-api/src/sse/responses.rs
++++ b/codex-rs/codex-api/src/sse/responses.rs
+@@ -107,6 +107,8 @@ pub fn spawn_response_stream(
+ #[allow(dead_code)]
+ struct ResponseCompleted {
+     id: String,
++    created_at: Option<i64>,
++    completed_at: Option<i64>,
+     #[serde(default)]
+     usage: Option<ResponseCompletedUsage>,
+     usage_metadata: Option<ResponseUsageMetadata>,
+@@ -440,6 +442,20 @@ pub fn process_responses_event(
+                         if let Some(metadata) = metadata {
+                             resp.usage_metadata.get_or_insert_default().metadata = Some(metadata);
+                         }
++                        if !interrupted
++                            && let Some(seconds) = resp
++                                .completed_at
++                                .zip(resp.created_at)
++                                .and_then(|(completed, created)| completed.checked_sub(created))
++                                .filter(|seconds| *seconds >= 0)
++                            && let serde_json::Value::Object(metadata) = resp
++                                .usage_metadata
++                                .get_or_insert_default()
++                                .metadata
++                                .get_or_insert_with(|| serde_json::json!({}))
++                        {
++                            metadata.insert("_codex_session_api_seconds".into(), seconds.into());
++                        }
+                         return Ok(Some(ResponseEvent::Completed {
+                             response_id: resp.id,
+                             token_usage: resp.usage.map(Into::into),
+diff --git a/codex-rs/tui/src/bottom_pane/status_line_setup.rs b/codex-rs/tui/src/bottom_pane/status_line_setup.rs
+index 2394d0c37b..dec5a6ebac 100644
+--- a/codex-rs/tui/src/bottom_pane/status_line_setup.rs
++++ b/codex-rs/tui/src/bottom_pane/status_line_setup.rs
+@@ -122,6 +122,9 @@ pub(crate) enum StatusLineItem {
+     /// Tokens in the current context window and its size.
+     ContextWindowUsage,
+ 
++    /// Elapsed CLI time and cumulative Responses API time.
++    SessionTime,
++
+     /// Total tokens used in the current session.
+     UsedTokens,
+ 
+@@ -197,6 +200,7 @@ impl StatusLineItem {
+                 "Total context window size in tokens (omitted when unknown)"
+             }
+             StatusLineItem::ContextWindowUsage => "Current context tokens / window size",
++            StatusLineItem::SessionTime => "Elapsed session time / completed API response time",
+             StatusLineItem::UsedTokens => "Total tokens used in session (omitted when zero)",
+             StatusLineItem::TotalInputTokens => "Total input tokens used in session",
+             StatusLineItem::TotalOutputTokens => "Total output tokens used in session",
+@@ -243,6 +247,7 @@ impl StatusLineItem {
+             StatusLineItem::CodexVersion => StatusSurfacePreviewItem::CodexVersion,
+             StatusLineItem::ContextWindowSize => StatusSurfacePreviewItem::ContextWindowSize,
+             StatusLineItem::ContextWindowUsage => StatusSurfacePreviewItem::ContextWindowUsage,
++            StatusLineItem::SessionTime => StatusSurfacePreviewItem::SessionTime,
+             StatusLineItem::UsedTokens => StatusSurfacePreviewItem::UsedTokens,
+             StatusLineItem::TotalInputTokens => StatusSurfacePreviewItem::TotalInputTokens,
+             StatusLineItem::TotalOutputTokens => StatusSurfacePreviewItem::TotalOutputTokens,
+diff --git a/codex-rs/tui/src/bottom_pane/status_line_style.rs b/codex-rs/tui/src/bottom_pane/status_line_style.rs
+index a54ee6c816..ab6f810132 100644
+--- a/codex-rs/tui/src/bottom_pane/status_line_style.rs
++++ b/codex-rs/tui/src/bottom_pane/status_line_style.rs
+@@ -46,6 +46,7 @@ impl StatusLineAccent {
+             | StatusLineItem::ContextUsed
+             | StatusLineItem::ContextWindowSize
+             | StatusLineItem::ContextWindowUsage
++            | StatusLineItem::SessionTime
+             | StatusLineItem::UsedTokens
+             | StatusLineItem::TotalInputTokens
+             | StatusLineItem::TotalOutputTokens
+@@ -146,7 +147,14 @@ where
+         } else {
+             style
+         };
+-        spans.push(Span::styled(text, style));
++        if item == StatusLineItem::SessionTime
++            && let Some((wall, api)) = text.split_once('/')
++        {
++            spans.push(Span::styled(wall.to_owned(), style.bold()));
++            spans.push(Span::styled(format!("/{api}"), style));
++        } else {
++            spans.push(Span::styled(text, style));
++        }
+     }
+ 
+     (!spans.is_empty()).then(|| Line::from(spans))
+diff --git a/codex-rs/tui/src/bottom_pane/status_surface_preview.rs b/codex-rs/tui/src/bottom_pane/status_surface_preview.rs
+index 8e98ab2b80..91e7bb9ef2 100644
+--- a/codex-rs/tui/src/bottom_pane/status_surface_preview.rs
++++ b/codex-rs/tui/src/bottom_pane/status_surface_preview.rs
+@@ -28,6 +28,7 @@ pub(crate) enum StatusSurfacePreviewItem {
+     CodexVersion,
+     ContextWindowSize,
+     ContextWindowUsage,
++    SessionTime,
+     UsedTokens,
+     TotalInputTokens,
+     TotalOutputTokens,
+@@ -66,6 +67,7 @@ impl StatusSurfacePreviewItem {
+             StatusSurfacePreviewItem::CodexVersion => "0.0.0",
+             StatusSurfacePreviewItem::ContextWindowSize => "0 window",
+             StatusSurfacePreviewItem::ContextWindowUsage => "0/0",
++            StatusSurfacePreviewItem::SessionTime => "0m:00s/0m:00s",
+             StatusSurfacePreviewItem::UsedTokens => "0 used",
+             StatusSurfacePreviewItem::TotalInputTokens => "0 in",
+             StatusSurfacePreviewItem::TotalOutputTokens => "0 out",
+@@ -104,6 +106,7 @@ impl StatusSurfacePreviewItem {
+             Self::CodexVersion,
+             Self::ContextWindowSize,
+             Self::ContextWindowUsage,
++            Self::SessionTime,
+             Self::UsedTokens,
+             Self::TotalInputTokens,
+             Self::TotalOutputTokens,
+diff --git a/codex-rs/tui/src/chatwidget/protocol.rs b/codex-rs/tui/src/chatwidget/protocol.rs
+index ba0d2e4061..2e2963045e 100644
+--- a/codex-rs/tui/src/chatwidget/protocol.rs
++++ b/codex-rs/tui/src/chatwidget/protocol.rs
+@@ -44,6 +44,21 @@ impl ChatWidget {
+             self.restore_retry_status_header_if_present();
+         }
+         match notification {
++            ServerNotification::RawResponseCompleted(notification) => {
++                if let Some(seconds) = notification
++                    .usage_metadata
++                    .as_ref()
++                    .and_then(|usage| usage.metadata.as_ref())
++                    .and_then(|metadata| metadata.get("_codex_session_api_seconds"))
++                    .and_then(serde_json::Value::as_u64)
++                {
++                    self.status_state.session_api_seconds = self
++                        .status_state
++                        .session_api_seconds
++                        .saturating_add(seconds);
++                    self.refresh_status_surfaces();
++                }
++            }
+             ServerNotification::ThreadTokenUsageUpdated(notification) => {
+                 self.set_token_info(Some(token_usage_info_from_app_server(
+                     notification.token_usage,
+@@ -352,7 +367,6 @@ impl ChatWidget {
+             | ServerNotification::ThreadUnarchived(_)
+             | ServerNotification::ThreadAttachmentUpdated(_)
+             | ServerNotification::RawResponseItemCompleted(_)
+-            | ServerNotification::RawResponseCompleted(_)
+             | ServerNotification::CommandExecOutputDelta(_)
+             | ServerNotification::ProcessOutputDelta(_)
+             | ServerNotification::ProcessExited(_)
+diff --git a/codex-rs/tui/src/chatwidget/status_state.rs b/codex-rs/tui/src/chatwidget/status_state.rs
+index 5fe1eba3da..fe54157078 100644
+--- a/codex-rs/tui/src/chatwidget/status_state.rs
++++ b/codex-rs/tui/src/chatwidget/status_state.rs
+@@ -123,6 +123,7 @@ pub(super) struct StatusState {
+     pub(super) retry_status_header: Option<String>,
+     pub(super) pending_status_indicator_restore: bool,
+     pub(super) thread_title_generation_pending: bool,
++    pub(super) session_api_seconds: u64,
+ }
+ 
+ impl Default for StatusState {
+@@ -138,6 +139,7 @@ impl Default for StatusState {
+             retry_status_header: None,
+             pending_status_indicator_restore: false,
+             thread_title_generation_pending: false,
++            session_api_seconds: 0,
+         }
+     }
+ }
+diff --git a/codex-rs/tui/src/chatwidget/status_surfaces.rs b/codex-rs/tui/src/chatwidget/status_surfaces.rs
+index 61b15b2f38..038090f880 100644
+--- a/codex-rs/tui/src/chatwidget/status_surfaces.rs
++++ b/codex-rs/tui/src/chatwidget/status_surfaces.rs
+@@ -258,7 +258,13 @@ impl ChatWidget {
+         let now = Instant::now();
+         self.terminal_title_next_refresh = self
+             .terminal_title_animation_interval_with_selections(selections)
+-            .map(|interval| now + interval);
++            .map(|interval| now + interval)
++            .or_else(|| {
++                selections
++                    .status_line_items
++                    .contains(&StatusLineItem::SessionTime)
++                    .then(|| now + Duration::from_secs(1))
++            });
+         if selections.terminal_title_items.is_empty() {
+             if let Err(err) = self.clear_managed_terminal_title() {
+                 tracing::debug!(error = %err, "failed to clear terminal title");
+@@ -314,6 +320,12 @@ impl ChatWidget {
+         let selections = self.status_surface_selections();
+         self.warn_invalid_terminal_title_items_once(&selections.invalid_terminal_title_items);
+         self.sync_status_surface_shared_state(&selections);
++        if selections
++            .status_line_items
++            .contains(&StatusLineItem::SessionTime)
++        {
++            self.refresh_status_line_from_selections(&selections);
++        }
+         self.refresh_terminal_title_from_selections(&selections);
+     }
+ 
+@@ -783,6 +795,17 @@ impl ChatWidget {
+                 let window = format_tokens_compact(self.status_line_context_window_size()?);
+                 Some(format!("{used}/{window}").to_ascii_lowercase())
+             }
++            StatusLineItem::SessionTime => {
++                let wall = self.terminal_title_animation_origin.elapsed().as_secs();
++                let api = self.status_state.session_api_seconds;
++                Some(format!(
++                    "{}m:{:02}s/{}m:{:02}s",
++                    wall / 60,
++                    wall % 60,
++                    api / 60,
++                    api % 60
++                ))
++            }
+             StatusLineItem::TotalInputTokens => (!self.token_usage_pending).then(|| {
+                 format!(
+                     "{} in",
+@@ -868,6 +891,7 @@ impl ChatWidget {
+             StatusSurfacePreviewItem::CodexVersion => StatusLineItem::CodexVersion,
+             StatusSurfacePreviewItem::ContextWindowSize => StatusLineItem::ContextWindowSize,
+             StatusSurfacePreviewItem::ContextWindowUsage => StatusLineItem::ContextWindowUsage,
++            StatusSurfacePreviewItem::SessionTime => StatusLineItem::SessionTime,
+             StatusSurfacePreviewItem::UsedTokens => StatusLineItem::UsedTokens,
+             StatusSurfacePreviewItem::TotalInputTokens => StatusLineItem::TotalInputTokens,
+             StatusSurfacePreviewItem::TotalOutputTokens => StatusLineItem::TotalOutputTokens,
