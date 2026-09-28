@@ -12,7 +12,7 @@ index 674b387702..f7838d0333 100644
  
  /// Chat context keybindings.
 diff --git a/codex-rs/tui/src/app/input.rs b/codex-rs/tui/src/app/input.rs
-index 0ab8d14e06..f4ec77381a 100644
+index 0ab8d14e06..5535a96665 100644
 --- a/codex-rs/tui/src/app/input.rs
 +++ b/codex-rs/tui/src/app/input.rs
 @@ -3,6 +3,7 @@
@@ -23,17 +23,7 @@ index 0ab8d14e06..f4ec77381a 100644
  use super::*;
  use crate::app_backtrack::SIDE_EDIT_PREVIOUS_UNAVAILABLE_MESSAGE;
  use crate::keymap::bindings_for_action;
-@@ -208,6 +209,9 @@ impl App {
-         if self.backtrack.overlay_preview_active && self.chat_widget.no_modal_or_popup_active() {
-             return KeymapContextSet::browsing().with_voice_toggle(&self.keymap);
-         }
-+        if self.chat_widget.active_view_id() == Some(AGENT_PICKER_VIEW_ID) {
-+            return KeymapContextSet::subagents().with_voice_toggle(&self.keymap);
-+        }
-         let voice_available = self.chat_widget.realtime_microphone_shortcut_available()
-             || self.voice_owner_thread_id().is_some();
-         let contexts = self.chat_widget.keymap_contexts();
-@@ -534,6 +538,19 @@ impl App {
+@@ -534,6 +535,19 @@ impl App {
              return;
          }
  
@@ -53,7 +43,7 @@ index 0ab8d14e06..f4ec77381a 100644
          let app_keymap_shortcuts_available = self.app_keymap_shortcuts_available();
          if app_keymap_shortcuts_available
              && self
-@@ -645,6 +662,15 @@ impl App {
+@@ -645,6 +659,15 @@ impl App {
          app_server: &mut AppServerSession,
          key_event: KeyEvent,
      ) -> bool {
@@ -106,7 +96,7 @@ index 571ae8d32b..f38fc4c6ad 100644
          let modal_or_popup_active = !self.bottom_pane.no_modal_or_popup_active();
          let should_pause_active_goal = self
 diff --git a/codex-rs/tui/src/keymap.rs b/codex-rs/tui/src/keymap.rs
-index 2ff06d2296..dac6f67c26 100644
+index 2ff06d2296..77f6189f6f 100644
 --- a/codex-rs/tui/src/keymap.rs
 +++ b/codex-rs/tui/src/keymap.rs
 @@ -117,6 +117,8 @@ pub(crate) struct AppKeymap {
@@ -171,44 +161,11 @@ index 2ff06d2296..dac6f67c26 100644
                  ("open_agents", self.app.open_agents.as_slice()),
                  ("open_transcript", self.app.open_transcript.as_slice()),
                  ("find_transcript", self.app.find_transcript.as_slice()),
-@@ -2296,6 +2316,13 @@ impl RuntimeKeymap {
-         )?;
- 
-         validate_unique("list", context_bindings(KeymapContext::List))?;
-+        validate_unique(
-+            "subagents",
-+            context_bindings(KeymapContext::List).chain([(
-+                "global.toggle_subagents",
-+                self.app.toggle_subagents.as_slice(),
-+            )]),
-+        )?;
-         validate_unique(
-             "activity",
-             context_bindings(KeymapContext::List).chain([
 diff --git a/codex-rs/tui/src/keymap/bindings.rs b/codex-rs/tui/src/keymap/bindings.rs
-index 3f521a4c3d..905a52300f 100644
+index 3f521a4c3d..c043a95367 100644
 --- a/codex-rs/tui/src/keymap/bindings.rs
 +++ b/codex-rs/tui/src/keymap/bindings.rs
-@@ -107,10 +107,16 @@ impl KeymapActionId {
-     pub(super) fn overlaps(self, other: Self) -> bool {
-         self.context.overlaps(other.context)
-             || (self.context == KeymapContext::Global
--                && matches!(self.action, "focus_activity" | "find_transcript")
-+                && matches!(
-+                    self.action,
-+                    "focus_activity" | "find_transcript" | "toggle_subagents"
-+                )
-                 && other.context == KeymapContext::List)
-             || (other.context == KeymapContext::Global
--                && matches!(other.action, "focus_activity" | "find_transcript")
-+                && matches!(
-+                    other.action,
-+                    "focus_activity" | "find_transcript" | "toggle_subagents"
-+                )
-                 && self.context == KeymapContext::List)
-     }
- 
-@@ -281,6 +287,8 @@ define_runtime_action_bindings! {
+@@ -281,6 +281,8 @@ define_runtime_action_bindings! {
          toggle_fast_mode,
          toggle_raw_output,
          toggle_side_conversation,
@@ -217,36 +174,3 @@ index 3f521a4c3d..905a52300f 100644
      ],
      "chat" => Chat, chat, chat [
          toggle_voice,
-diff --git a/codex-rs/tui/src/keymap/chords.rs b/codex-rs/tui/src/keymap/chords.rs
-index 0ad0f5e524..64bdb9bb43 100644
---- a/codex-rs/tui/src/keymap/chords.rs
-+++ b/codex-rs/tui/src/keymap/chords.rs
-@@ -47,6 +47,7 @@ const WARNINGS_FOCUS: u32 = 1 << 16;
- const VOICE_TOGGLE: u32 = 1 << 17;
- const RAW_KEY_CAPTURE: u32 = 1 << 18;
- const VOICE_TOGGLE_BLOCKED: u32 = 1 << 19;
-+const SUBAGENTS_FOCUS: u32 = 1 << 20;
- 
- const TRANSCRIPT_BROWSING: u32 = 1 << 14;
- 
-@@ -81,6 +82,10 @@ impl KeymapContextSet {
-         Self(context_bit(KeymapContext::List) | context_bit(KeymapContext::Global) | WARNINGS_FOCUS)
-     }
- 
-+    pub(crate) const fn subagents() -> Self {
-+        Self(context_bit(KeymapContext::List) | SUBAGENTS_FOCUS)
-+    }
-+
-     pub(crate) const fn is_warnings(self) -> bool {
-         self.0 & WARNINGS_FOCUS != 0
-     }
-@@ -141,6 +146,9 @@ impl KeymapContextSet {
-             return self.0 & VOICE_TOGGLE_BLOCKED == 0
-                 && (self.0 & VOICE_TOGGLE != 0 || self.contains(KeymapContext::Chat));
-         }
-+        if action.context == KeymapContext::Global && self.0 & SUBAGENTS_FOCUS != 0 {
-+            return action.action == "toggle_subagents";
-+        }
-         self.contains(action.context)
-             && (self.0 & ACTIVITY_FOCUS == 0
-                 || action.context != KeymapContext::Global
