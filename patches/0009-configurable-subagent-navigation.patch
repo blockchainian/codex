@@ -1,28 +1,62 @@
 diff --git a/codex-rs/config/src/tui_keymap.rs b/codex-rs/config/src/tui_keymap.rs
-index 674b387702..c17eb30b9c 100644
+index 674b387702..f7838d0333 100644
 --- a/codex-rs/config/src/tui_keymap.rs
 +++ b/codex-rs/config/src/tui_keymap.rs
 @@ -120,6 +120,8 @@ pub struct TuiGlobalKeymap {
      pub toggle_raw_output: Option<KeybindingsSpec>,
      /// Switch between a side conversation and its parent without closing either.
      pub toggle_side_conversation: Option<KeybindingsSpec>,
-+    pub open_subagents: Option<KeybindingsSpec>,
++    pub toggle_subagents: Option<KeybindingsSpec>,
 +    pub open_main_agent: Option<KeybindingsSpec>,
  }
  
  /// Chat context keybindings.
 diff --git a/codex-rs/tui/src/app/input.rs b/codex-rs/tui/src/app/input.rs
-index 0ab8d14e06..8ca0f0d63d 100644
+index 0ab8d14e06..f4ec77381a 100644
 --- a/codex-rs/tui/src/app/input.rs
 +++ b/codex-rs/tui/src/app/input.rs
-@@ -645,6 +645,19 @@ impl App {
+@@ -3,6 +3,7 @@
+ //! This module owns global key bindings that sit above ChatWidget, including transcript overlay
+ //! entry, Ctrl-L clear, external editor launch, and agent navigation shortcuts.
+ 
++use super::agent_picker::AGENT_PICKER_VIEW_ID;
+ use super::*;
+ use crate::app_backtrack::SIDE_EDIT_PREVIOUS_UNAVAILABLE_MESSAGE;
+ use crate::keymap::bindings_for_action;
+@@ -208,6 +209,9 @@ impl App {
+         if self.backtrack.overlay_preview_active && self.chat_widget.no_modal_or_popup_active() {
+             return KeymapContextSet::browsing().with_voice_toggle(&self.keymap);
+         }
++        if self.chat_widget.active_view_id() == Some(AGENT_PICKER_VIEW_ID) {
++            return KeymapContextSet::subagents().with_voice_toggle(&self.keymap);
++        }
+         let voice_available = self.chat_widget.realtime_microphone_shortcut_available()
+             || self.voice_owner_thread_id().is_some();
+         let contexts = self.chat_widget.keymap_contexts();
+@@ -534,6 +538,19 @@ impl App {
+             return;
+         }
+ 
++        if self.overlay.is_none()
++            && self.keymap.app.toggle_subagents.is_pressed(key_event)
++            && (self.chat_widget.no_modal_or_popup_active()
++                || self.chat_widget.active_view_id() == Some(AGENT_PICKER_VIEW_ID))
++        {
++            if self.chat_widget.active_view_id() == Some(AGENT_PICKER_VIEW_ID) {
++                self.chat_widget.on_ctrl_c();
++            } else {
++                self.app_event_tx.send(AppEvent::OpenAgentPicker);
++            }
++            return;
++        }
++
+         let app_keymap_shortcuts_available = self.app_keymap_shortcuts_available();
+         if app_keymap_shortcuts_available
+             && self
+@@ -645,6 +662,15 @@ impl App {
          app_server: &mut AppServerSession,
          key_event: KeyEvent,
      ) -> bool {
-+        if self.keymap.app.open_subagents.is_pressed(key_event) {
-+            self.app_event_tx.send(AppEvent::OpenAgentPicker);
-+            return true;
-+        }
 +        if self.keymap.app.open_main_agent.is_pressed(key_event) {
 +            if let Some(thread_id) = self.primary_thread_id
 +                && self.current_displayed_thread_id() != Some(thread_id)
@@ -35,15 +69,51 @@ index 0ab8d14e06..8ca0f0d63d 100644
          if self.keymap.app.open_warnings.is_pressed(key_event) {
              self.chat_widget.open_warnings(&self.transcript_cells);
              return true;
+diff --git a/codex-rs/tui/src/bottom_pane/mod.rs b/codex-rs/tui/src/bottom_pane/mod.rs
+index b9e1ba3681..91378f3810 100644
+--- a/codex-rs/tui/src/bottom_pane/mod.rs
++++ b/codex-rs/tui/src/bottom_pane/mod.rs
+@@ -1739,7 +1739,6 @@ impl BottomPane {
+                 .is_some_and(|view| view.will_interrupt_turn_on_key_event(key_event))
+     }
+ 
+-    #[cfg(test)]
+     pub(crate) fn active_view_id(&self) -> Option<&'static str> {
+         self.view_stack.last().and_then(|view| view.view_id())
+     }
+diff --git a/codex-rs/tui/src/chatwidget/interaction.rs b/codex-rs/tui/src/chatwidget/interaction.rs
+index 571ae8d32b..f38fc4c6ad 100644
+--- a/codex-rs/tui/src/chatwidget/interaction.rs
++++ b/codex-rs/tui/src/chatwidget/interaction.rs
+@@ -324,6 +324,10 @@ impl ChatWidget {
+         self.bottom_pane.selected_index_for_present_view(view_id)
+     }
+ 
++    pub(crate) fn active_view_id(&self) -> Option<&'static str> {
++        self.bottom_pane.active_view_id()
++    }
++
+     pub(crate) fn selected_index_for_active_view(&self, view_id: &'static str) -> Option<usize> {
+         self.bottom_pane.selected_index_for_active_view(view_id)
+     }
+@@ -507,7 +511,7 @@ impl ChatWidget {
+     ///
+     /// When the double-press quit shortcut is enabled, pressing the same shortcut again before
+     /// expiry requests a shutdown-first quit.
+-    pub(super) fn on_ctrl_c(&mut self) {
++    pub(crate) fn on_ctrl_c(&mut self) {
+         let key = key_hint::ctrl(KeyCode::Char('c'));
+         let modal_or_popup_active = !self.bottom_pane.no_modal_or_popup_active();
+         let should_pause_active_goal = self
 diff --git a/codex-rs/tui/src/keymap.rs b/codex-rs/tui/src/keymap.rs
-index 2ff06d2296..395b3cb874 100644
+index 2ff06d2296..dac6f67c26 100644
 --- a/codex-rs/tui/src/keymap.rs
 +++ b/codex-rs/tui/src/keymap.rs
 @@ -117,6 +117,8 @@ pub(crate) struct AppKeymap {
      pub(crate) toggle_raw_output: Vec<KeyBinding>,
      /// Switch between a side conversation and its parent without closing either.
      pub(crate) toggle_side_conversation: Vec<KeyBinding>,
-+    pub(crate) open_subagents: Vec<KeyBinding>,
++    pub(crate) toggle_subagents: Vec<KeyBinding>,
 +    pub(crate) open_main_agent: Vec<KeyBinding>,
  }
  
@@ -52,10 +122,10 @@ index 2ff06d2296..395b3cb874 100644
                      "tui.keymap.global.toggle_side_conversation",
                  )?
              },
-+            open_subagents: resolve_bindings(
-+                keymap.global.open_subagents.as_ref(),
-+                &defaults.app.open_subagents,
-+                "tui.keymap.global.open_subagents",
++            toggle_subagents: resolve_bindings(
++                keymap.global.toggle_subagents.as_ref(),
++                &defaults.app.toggle_subagents,
++                "tui.keymap.global.toggle_subagents",
 +            )?,
 +            open_main_agent: resolve_bindings(
 +                keymap.global.open_main_agent.as_ref(),
@@ -69,7 +139,7 @@ index 2ff06d2296..395b3cb874 100644
                  toggle_fast_mode: default_bindings![],
                  toggle_raw_output: default_bindings![alt(KeyCode::Char('r'))],
                  toggle_side_conversation: default_bindings![ctrl(KeyCode::Char('/'))],
-+                open_subagents: default_bindings![],
++                toggle_subagents: default_bindings![],
 +                open_main_agent: default_bindings![],
              },
              chords: Arc::default(),
@@ -78,7 +148,7 @@ index 2ff06d2296..395b3cb874 100644
          #[cfg(unix)]
          for (action, bindings) in [
              ("global.open_agents", &self.app.open_agents),
-+            ("global.open_subagents", &self.app.open_subagents),
++            ("global.toggle_subagents", &self.app.toggle_subagents),
 +            ("global.open_main_agent", &self.app.open_main_agent),
              ("chat.toggle_voice", &self.chat.toggle_voice),
          ] {
@@ -87,7 +157,7 @@ index 2ff06d2296..395b3cb874 100644
          }
  
          let main_bindings = [
-+            ("open_subagents", self.app.open_subagents.as_slice()),
++            ("toggle_subagents", self.app.toggle_subagents.as_slice()),
 +            ("open_main_agent", self.app.open_main_agent.as_slice()),
              ("open_agents", self.app.open_agents.as_slice()),
              ("open_transcript", self.app.open_transcript.as_slice()),
@@ -96,21 +166,87 @@ index 2ff06d2296..395b3cb874 100644
          validate_no_shadow_with_allowed_overlaps(
              "main",
              [
-+                ("open_subagents", self.app.open_subagents.as_slice()),
++                ("toggle_subagents", self.app.toggle_subagents.as_slice()),
 +                ("open_main_agent", self.app.open_main_agent.as_slice()),
                  ("open_agents", self.app.open_agents.as_slice()),
                  ("open_transcript", self.app.open_transcript.as_slice()),
                  ("find_transcript", self.app.find_transcript.as_slice()),
+@@ -2296,6 +2316,13 @@ impl RuntimeKeymap {
+         )?;
+ 
+         validate_unique("list", context_bindings(KeymapContext::List))?;
++        validate_unique(
++            "subagents",
++            context_bindings(KeymapContext::List).chain([(
++                "global.toggle_subagents",
++                self.app.toggle_subagents.as_slice(),
++            )]),
++        )?;
+         validate_unique(
+             "activity",
+             context_bindings(KeymapContext::List).chain([
 diff --git a/codex-rs/tui/src/keymap/bindings.rs b/codex-rs/tui/src/keymap/bindings.rs
-index 3f521a4c3d..ed16d370a2 100644
+index 3f521a4c3d..905a52300f 100644
 --- a/codex-rs/tui/src/keymap/bindings.rs
 +++ b/codex-rs/tui/src/keymap/bindings.rs
-@@ -281,6 +281,8 @@ define_runtime_action_bindings! {
+@@ -107,10 +107,16 @@ impl KeymapActionId {
+     pub(super) fn overlaps(self, other: Self) -> bool {
+         self.context.overlaps(other.context)
+             || (self.context == KeymapContext::Global
+-                && matches!(self.action, "focus_activity" | "find_transcript")
++                && matches!(
++                    self.action,
++                    "focus_activity" | "find_transcript" | "toggle_subagents"
++                )
+                 && other.context == KeymapContext::List)
+             || (other.context == KeymapContext::Global
+-                && matches!(other.action, "focus_activity" | "find_transcript")
++                && matches!(
++                    other.action,
++                    "focus_activity" | "find_transcript" | "toggle_subagents"
++                )
+                 && self.context == KeymapContext::List)
+     }
+ 
+@@ -281,6 +287,8 @@ define_runtime_action_bindings! {
          toggle_fast_mode,
          toggle_raw_output,
          toggle_side_conversation,
-+        open_subagents,
++        toggle_subagents,
 +        open_main_agent,
      ],
      "chat" => Chat, chat, chat [
          toggle_voice,
+diff --git a/codex-rs/tui/src/keymap/chords.rs b/codex-rs/tui/src/keymap/chords.rs
+index 0ad0f5e524..64bdb9bb43 100644
+--- a/codex-rs/tui/src/keymap/chords.rs
++++ b/codex-rs/tui/src/keymap/chords.rs
+@@ -47,6 +47,7 @@ const WARNINGS_FOCUS: u32 = 1 << 16;
+ const VOICE_TOGGLE: u32 = 1 << 17;
+ const RAW_KEY_CAPTURE: u32 = 1 << 18;
+ const VOICE_TOGGLE_BLOCKED: u32 = 1 << 19;
++const SUBAGENTS_FOCUS: u32 = 1 << 20;
+ 
+ const TRANSCRIPT_BROWSING: u32 = 1 << 14;
+ 
+@@ -81,6 +82,10 @@ impl KeymapContextSet {
+         Self(context_bit(KeymapContext::List) | context_bit(KeymapContext::Global) | WARNINGS_FOCUS)
+     }
+ 
++    pub(crate) const fn subagents() -> Self {
++        Self(context_bit(KeymapContext::List) | SUBAGENTS_FOCUS)
++    }
++
+     pub(crate) const fn is_warnings(self) -> bool {
+         self.0 & WARNINGS_FOCUS != 0
+     }
+@@ -141,6 +146,9 @@ impl KeymapContextSet {
+             return self.0 & VOICE_TOGGLE_BLOCKED == 0
+                 && (self.0 & VOICE_TOGGLE != 0 || self.contains(KeymapContext::Chat));
+         }
++        if action.context == KeymapContext::Global && self.0 & SUBAGENTS_FOCUS != 0 {
++            return action.action == "toggle_subagents";
++        }
+         self.contains(action.context)
+             && (self.0 & ACTIVITY_FOCUS == 0
+                 || action.context != KeymapContext::Global
