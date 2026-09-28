@@ -1,0 +1,18 @@
+diff --git a/codex-rs/tui/src/history_cell/session.rs b/codex-rs/tui/src/history_cell/session.rs
+index 32d2f0d3ff..61022e997d 100644
+--- a/codex-rs/tui/src/history_cell/session.rs
++++ b/codex-rs/tui/src/history_cell/session.rs
+@@ -374,13 +374,6 @@ impl HistoryCell for SessionHeaderHistoryCell {
+                 "YOLO mode".magenta().bold(),
+             ]));
+         }
+-        if let Some(greeting) = self.greeting.get() {
+-            // The tip/help that follows has its own normal composite separator.
+-            lines.extend([
+-                Line::default(),
+-                Line::from(vec!["  ".into(), greeting.phrase.fg(accent_color())]),
+-            ]);
+-        }
+         lines
+             .into_iter()
+             .map(|line| truncate_line_with_ellipsis_if_overflow(line, width))
