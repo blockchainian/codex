@@ -230,3 +230,16 @@ index 61b15b2f38..038090f880 100644
              StatusSurfacePreviewItem::UsedTokens => StatusLineItem::UsedTokens,
              StatusSurfacePreviewItem::TotalInputTokens => StatusLineItem::TotalInputTokens,
              StatusSurfacePreviewItem::TotalOutputTokens => StatusLineItem::TotalOutputTokens,
+diff --git a/codex-rs/app-server/src/request_processors/thread_lifecycle.rs b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
+index b0fa49b4ba..0309ff4007 100644
+--- a/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
++++ b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
+@@ -327,7 +327,7 @@ pub(super) async fn ensure_listener_task_running(
+                     };
+                     if matches!(
+                         &event.msg,
+-                        EventMsg::RawResponseItem(_) | EventMsg::RawResponseCompleted(_)
++                        EventMsg::RawResponseItem(_)
+                     ) && !raw_events_enabled
+                     {
+                         continue;
