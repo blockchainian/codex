@@ -109,8 +109,8 @@ index 2ff06d2296..77f6189f6f 100644
                  toggle_fast_mode: default_bindings![],
                  toggle_raw_output: default_bindings![alt(KeyCode::Char('r'))],
                  toggle_side_conversation: default_bindings![ctrl(KeyCode::Char('/'))],
-+                toggle_subagents: default_bindings![],
-+                open_main_agent: default_bindings![],
++                toggle_subagents: default_bindings![alt(KeyCode::Char('a'))],
++                open_main_agent: default_bindings![alt(KeyCode::Char('q'))],
              },
              chords: Arc::default(),
              chat: ChatKeymap {
