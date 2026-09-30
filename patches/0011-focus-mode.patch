@@ -1,0 +1,152 @@
+diff --git a/codex-rs/config/src/types.rs b/codex-rs/config/src/types.rs
+index e44f737c18..ff10eda151 100644
+--- a/codex-rs/config/src/types.rs
++++ b/codex-rs/config/src/types.rs
+@@ -860,6 +860,10 @@ pub struct Tui {
+     #[serde(default = "default_true")]
+     pub fullscreen_transcript: bool,
+ 
++    /// Keep command, patch, and tool activity out of the main view; the transcript retains it.
++    #[serde(default)]
++    pub focus: bool,
++
+     /// Copy selected transcript text when the mouse button is released.
+     /// Defaults to `auto`: enabled except in direct terminals known to forward their native
+     /// copy shortcut (Ghostty 1.2+, Kitty on macOS, Windows Terminal, and VS Code on Windows).
+diff --git a/codex-rs/core/src/config/config_tests.rs b/codex-rs/core/src/config/config_tests.rs
+index fca03ece47..d5e9ca4a7d 100644
+--- a/codex-rs/core/src/config/config_tests.rs
++++ b/codex-rs/core/src/config/config_tests.rs
+@@ -1269,6 +1269,7 @@ fn config_toml_deserializes_model_availability_nux() {
+             question_esc_back: true,
+             raw_output_mode: false,
+             fullscreen_transcript: true,
++            focus: false,
+             copy_on_select: Default::default(),
+             right_click_paste: Default::default(),
+             alternate_screen: AltScreenMode::default(),
+@@ -4410,6 +4411,7 @@ fn tui_config_missing_notifications_field_defaults_to_enabled() {
+             question_esc_back: true,
+             raw_output_mode: false,
+             fullscreen_transcript: true,
++            focus: false,
+             copy_on_select: Default::default(),
+             right_click_paste: Default::default(),
+             alternate_screen: AltScreenMode::Auto,
+diff --git a/codex-rs/core/src/config/mod.rs b/codex-rs/core/src/config/mod.rs
+index 571fc2d81b..5ded661bb1 100644
+--- a/codex-rs/core/src/config/mod.rs
++++ b/codex-rs/core/src/config/mod.rs
+@@ -790,6 +790,9 @@ pub struct Config {
+     /// Own the fullscreen transcript when the alternate screen is enabled.
+     pub tui_fullscreen_transcript: bool,
+ 
++    /// Keep command, patch, and tool activity out of the main view.
++    pub tui_focus: bool,
++
+     /// Override the terminal-specific default for copying transcript mouse selections.
+     pub tui_copy_on_select: codex_config::types::CopyOnSelect,
+ 
+@@ -4501,6 +4504,7 @@ impl Config {
+                 .tui
+                 .as_ref()
+                 .is_none_or(|tui| tui.fullscreen_transcript),
++            tui_focus: cfg.tui.as_ref().is_some_and(|tui| tui.focus),
+             tui_copy_on_select: cfg
+                 .tui
+                 .as_ref()
+diff --git a/codex-rs/thread-manager-sample/src/main.rs b/codex-rs/thread-manager-sample/src/main.rs
+index 29e08651ff..d05c3fd2b0 100644
+--- a/codex-rs/thread-manager-sample/src/main.rs
++++ b/codex-rs/thread-manager-sample/src/main.rs
+@@ -287,6 +287,7 @@ async fn new_config(
+         tui_auto_recap: true,
+         model_availability_nux: ModelAvailabilityNuxConfig::default(),
+         tui_fullscreen_transcript: false,
++        tui_focus: false,
+         tui_copy_on_select: Default::default(),
+         tui_right_click_paste: Default::default(),
+         tui_alternate_screen: AltScreenMode::Auto,
+diff --git a/codex-rs/tui/src/app/history_ui.rs b/codex-rs/tui/src/app/history_ui.rs
+index 52e7e0203e..1bb54a57c1 100644
+--- a/codex-rs/tui/src/app/history_ui.rs
++++ b/codex-rs/tui/src/app/history_ui.rs
+@@ -21,6 +21,18 @@ pub(super) struct ThreadUsageStatusHistory {
+     pub(super) lines: Vec<HyperlinkLine>,
+ }
+ 
++/// Activity that focus mode keeps out of the main view; the transcript still retains it.
++fn is_focus_hidden_activity(cell: &dyn HistoryCell) -> bool {
++    let cell = cell.as_any();
++    cell.is::<crate::exec_cell::ExecCell>()
++        || cell.is::<history_cell::PatchHistoryCell>()
++        || cell.is::<history_cell::ViewImageHistoryCell>()
++        || cell.is::<history_cell::McpToolCallCell>()
++        || cell.is::<history_cell::DynamicToolCallCell>()
++        || cell.is::<history_cell::WebSearchCell>()
++        || cell.is::<history_cell::ComputerActivityCell>()
++}
++
+ impl App {
+     pub(super) fn insert_history_cell(&mut self, tui: &mut tui::Tui, cell: Box<dyn HistoryCell>) {
+         // Global deprecations can be delivered again by hidden threads. Scope deduplication to
+@@ -57,6 +69,9 @@ impl App {
+             tui.frame_requester().schedule_frame();
+         }
+         self.transcript_cells.push(cell.clone());
++        if self.config.tui_focus && is_focus_hidden_activity(cell.as_ref()) {
++            return;
++        }
+         let deferred = tui.is_owned_screen() || self.native_history.insert(&cell);
+         self.render_inserted_history_cell(tui, &cell, deferred);
+         // A committed cell can unblock a settled /usage card that was waiting
+diff --git a/codex-rs/tui/src/chatwidget/streaming.rs b/codex-rs/tui/src/chatwidget/streaming.rs
+index d1d17f8cd5..be33bf22cc 100644
+--- a/codex-rs/tui/src/chatwidget/streaming.rs
++++ b/codex-rs/tui/src/chatwidget/streaming.rs
+@@ -360,13 +360,16 @@ impl ChatWidget {
+             let reasoning_parts = std::mem::take(&mut self.reasoning_summary_parts);
+             let mut cell =
+                 history_cell::new_reasoning_summary_block(reasoning_parts, &self.config.cwd);
++            // Focus mode shows reasoning in the main view instead of folding it into activity.
++            let focus = self.config.tui_focus;
++            cell.set_transcript_only(!focus);
+             if let Some(id) = &self.status_state.reasoning_item_id {
+                 cell.set_source_item_id(id.clone());
+             }
+             let cell: Box<dyn HistoryCell> = cell;
+             let result = match self.transcript.active_cell.as_mut() {
+-                Some(active) => active.append_reasoning(cell),
+-                None => Err(cell),
++                Some(active) if !focus => active.append_reasoning(cell),
++                _ => Err(cell),
+             };
+             match result {
+                 Ok(()) => self.bump_active_cell_revision(),
+diff --git a/codex-rs/tui/src/history_cell/messages.rs b/codex-rs/tui/src/history_cell/messages.rs
+index f80f311c75..75960b9e7b 100644
+--- a/codex-rs/tui/src/history_cell/messages.rs
++++ b/codex-rs/tui/src/history_cell/messages.rs
+@@ -348,6 +348,10 @@ impl ReasoningSummaryCell {
+         self.transcript_only
+     }
+ 
++    pub(crate) fn set_transcript_only(&mut self, transcript_only: bool) {
++        self.transcript_only = transcript_only;
++    }
++
+     /// Create a reasoning summary cell that will render local file links relative to the session
+     /// cwd active when the summary was recorded.
+     pub(crate) fn new(header: String, content: String, cwd: &Path, transcript_only: bool) -> Self {
+diff --git a/codex-rs/tui/src/local_settings.rs b/codex-rs/tui/src/local_settings.rs
+index 4eb78a510c..709888ac90 100644
+--- a/codex-rs/tui/src/local_settings.rs
++++ b/codex-rs/tui/src/local_settings.rs
+@@ -75,6 +75,7 @@ impl LocalSettings {
+                 question_esc_back: config.tui_question_esc_back,
+                 raw_output_mode: config.tui_raw_output_mode,
+                 fullscreen_transcript: config.tui_fullscreen_transcript,
++                focus: config.tui_focus,
+                 copy_on_select: config.tui_copy_on_select,
+                 right_click_paste: config.tui_right_click_paste,
+                 alternate_screen: config.tui_alternate_screen,
