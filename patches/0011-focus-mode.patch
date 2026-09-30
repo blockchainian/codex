@@ -1,5 +1,5 @@
 diff --git a/codex-rs/tui/src/app/history_ui.rs b/codex-rs/tui/src/app/history_ui.rs
-index 52e7e0203e..ca2223ed98 100644
+index 52e7e0203e..41cdf44a6c 100644
 --- a/codex-rs/tui/src/app/history_ui.rs
 +++ b/codex-rs/tui/src/app/history_ui.rs
 @@ -21,7 +21,31 @@ pub(super) struct ThreadUsageStatusHistory {
@@ -25,7 +25,7 @@ index 52e7e0203e..ca2223ed98 100644
 +        cell: &dyn HistoryCell,
 +        width: u16,
 +    ) -> Vec<HyperlinkLine> {
-+        if self.chat_widget.focus_mode() && is_hidden_activity(cell) {
++        if self.chat_widget.focus_mode && is_hidden_activity(cell) {
 +            return Vec::new();
 +        }
 +        cell.display_hyperlink_lines_for_mode(width, self.chat_widget.history_render_mode())
@@ -44,7 +44,7 @@ index 52e7e0203e..ca2223ed98 100644
              Vec::new()
          };
 diff --git a/codex-rs/tui/src/app/resize_reflow.rs b/codex-rs/tui/src/app/resize_reflow.rs
-index 632ac8b4de..00b2a27a39 100644
+index 632ac8b4de..858539235f 100644
 --- a/codex-rs/tui/src/app/resize_reflow.rs
 +++ b/codex-rs/tui/src/app/resize_reflow.rs
 @@ -92,8 +92,7 @@ impl App {
@@ -79,41 +79,18 @@ index 632ac8b4de..00b2a27a39 100644
              rendered_rows += lines.len();
              cell_displays.push_front(ReflowCellDisplay {
                  lines,
-@@ -685,10 +680,7 @@ impl App {
-             start -= 1;
-             let cell = self.transcript_cells[start].clone();
-             cell_displays.push_front(ReflowCellDisplay {
--                lines: cell.display_hyperlink_lines_for_mode(
--                    width,
--                    self.chat_widget.history_render_mode(),
--                ),
-+                lines: self.scrollback_lines(cell.as_ref(), width),
-                 is_stream_continuation: cell.is_stream_continuation(),
-             });
-         }
 diff --git a/codex-rs/tui/src/chatwidget.rs b/codex-rs/tui/src/chatwidget.rs
-index eb9c9cdfa2..4e68c9662b 100644
+index eb9c9cdfa2..74c163efc8 100644
 --- a/codex-rs/tui/src/chatwidget.rs
 +++ b/codex-rs/tui/src/chatwidget.rs
 @@ -521,6 +521,7 @@ pub(crate) struct ChatWidget {
      config: Config,
      pub(crate) local_settings: crate::local_settings::LocalSettings,
      raw_output_mode: bool,
-+    focus_mode: bool,
++    pub(crate) focus_mode: bool,
      /// Runtime value resolved by core. `config.service_tier` remains the explicit user choice.
      effective_service_tier: Option<String>,
      /// The unmasked collaboration mode settings (always Default mode).
-@@ -1623,6 +1624,10 @@ impl ChatWidget {
-         self.raw_output_mode
-     }
- 
-+    pub(crate) fn focus_mode(&self) -> bool {
-+        self.focus_mode
-+    }
-+
-     pub(crate) fn history_render_mode(&self) -> HistoryRenderMode {
-         if self.raw_output_mode {
-             HistoryRenderMode::Raw
 diff --git a/codex-rs/tui/src/chatwidget/constructor.rs b/codex-rs/tui/src/chatwidget/constructor.rs
 index fb4575ab0d..d03a3fe635 100644
 --- a/codex-rs/tui/src/chatwidget/constructor.rs
@@ -153,7 +130,7 @@ index 4fe2ed057b..238feb0365 100644
              | SlashCommand::Diff
              | SlashCommand::App
 diff --git a/codex-rs/tui/src/slash_command.rs b/codex-rs/tui/src/slash_command.rs
-index 301de2e054..1f0ffe9b42 100644
+index 301de2e054..99a20e9b71 100644
 --- a/codex-rs/tui/src/slash_command.rs
 +++ b/codex-rs/tui/src/slash_command.rs
 @@ -47,6 +47,7 @@ pub enum SlashCommand {
@@ -164,25 +141,15 @@ index 301de2e054..1f0ffe9b42 100644
      Tui,
      Diff,
      Mention,
-@@ -107,6 +108,9 @@ impl SlashCommand {
+@@ -107,6 +108,7 @@ impl SlashCommand {
              SlashCommand::Copy => "copy the last response or part of it",
              SlashCommand::Export => "export the conversation as markdown",
              SlashCommand::Raw => "toggle raw scrollback mode for copy-friendly terminal selection",
-+            SlashCommand::Focus => {
-+                "toggle hiding command, edit, and tool activity in the main view"
-+            }
++            SlashCommand::Focus => "toggle hiding tool activity in the main view",
              SlashCommand::Tui => "choose the TUI mode for the next launch",
              SlashCommand::Diff => "show git diff (including untracked files)",
              SlashCommand::Mention => "mention a file",
-@@ -179,6 +183,7 @@ impl SlashCommand {
-                 | SlashCommand::Mcp
-                 | SlashCommand::Export
-                 | SlashCommand::Raw
-+                | SlashCommand::Focus
-                 | SlashCommand::Cd
-                 | SlashCommand::Pwd
-                 | SlashCommand::Usage
-@@ -267,6 +272,7 @@ impl SlashCommand {
+@@ -267,6 +269,7 @@ impl SlashCommand {
              | SlashCommand::Permissions
              | SlashCommand::Copy
              | SlashCommand::Raw
