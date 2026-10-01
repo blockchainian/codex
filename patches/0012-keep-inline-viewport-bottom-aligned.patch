@@ -1,0 +1,21 @@
+diff --git a/codex-rs/tui/src/tui.rs b/codex-rs/tui/src/tui.rs
+index 27b1950d0a..9a30ac5a03 100644
+--- a/codex-rs/tui/src/tui.rs
++++ b/codex-rs/tui/src/tui.rs
+@@ -1200,7 +1200,6 @@ impl Tui {
+         scrollback: ScrollbackStrategy,
+     ) -> Result<bool> {
+         let terminal_height_shrank = screen_size.height < terminal.last_known_screen_size.height;
+-        let terminal_height_grew = screen_size.height > terminal.last_known_screen_size.height;
+         let viewport_was_bottom_aligned =
+             terminal.viewport_area.bottom() == terminal.last_known_screen_size.height;
+         let previous_area = terminal.viewport_area;
+@@ -1216,7 +1215,7 @@ impl Tui {
+                 scrollback.grow_viewport(terminal, area.top(), screen_size, scroll_by)?;
+             }
+             area.y = screen_size.height - area.height;
+-        } else if terminal_height_grew && viewport_was_bottom_aligned {
++        } else if !terminal_height_shrank && viewport_was_bottom_aligned {
+             area.y = screen_size.height - area.height;
+         }
+ 
