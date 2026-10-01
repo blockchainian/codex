@@ -1,3 +1,16 @@
+diff --git a/codex-rs/app-server/src/request_processors/thread_lifecycle.rs b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
+index b0fa49b4ba..0309ff4007 100644
+--- a/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
++++ b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
+@@ -327,7 +327,7 @@ pub(super) async fn ensure_listener_task_running(
+                     };
+                     if matches!(
+                         &event.msg,
+-                        EventMsg::RawResponseItem(_) | EventMsg::RawResponseCompleted(_)
++                        EventMsg::RawResponseItem(_)
+                     ) && !raw_events_enabled
+                     {
+                         continue;
 diff --git a/codex-rs/codex-api/src/sse/responses.rs b/codex-rs/codex-api/src/sse/responses.rs
 index c01b13f1fe..6721d1d4c8 100644
 --- a/codex-rs/codex-api/src/sse/responses.rs
@@ -32,6 +45,28 @@ index c01b13f1fe..6721d1d4c8 100644
                          return Ok(Some(ResponseEvent::Completed {
                              response_id: resp.id,
                              token_usage: resp.usage.map(Into::into),
+diff --git a/codex-rs/rollout/src/policy.rs b/codex-rs/rollout/src/policy.rs
+index c82b5ce958..a6abda92f7 100644
+--- a/codex-rs/rollout/src/policy.rs
++++ b/codex-rs/rollout/src/policy.rs
+@@ -116,7 +116,8 @@ pub fn should_persist_event_msg(ev: &EventMsg, history_mode: ThreadHistoryMode)
+         | EventMsg::TurnAborted(_)
+         | EventMsg::TurnStarted(_)
+         | EventMsg::TurnComplete(_)
+-        | EventMsg::ThreadSettingsApplied(_) => true,
++        | EventMsg::ThreadSettingsApplied(_)
++        | EventMsg::RawResponseCompleted(_) => true,
+ 
+         // Only persist these legacy events when the thread's history mode is Legacy.
+         // New, paginated rollouts persist ItemCompleted events with TurnItems.
+@@ -165,7 +166,6 @@ pub fn should_persist_event_msg(ev: &EventMsg, history_mode: ThreadHistoryMode)
+         | EventMsg::TurnModerationMetadata(_)
+         | EventMsg::AgentReasoningSectionBreak(_)
+         | EventMsg::RawResponseItem(_)
+-        | EventMsg::RawResponseCompleted(_)
+         | EventMsg::SessionConfigured(_)
+         | EventMsg::EnvironmentConnected(_)
+         | EventMsg::EnvironmentDisconnected(_)
 diff --git a/codex-rs/tui/src/bottom_pane/status_line_setup.rs b/codex-rs/tui/src/bottom_pane/status_line_setup.rs
 index 2394d0c37b..dec5a6ebac 100644
 --- a/codex-rs/tui/src/bottom_pane/status_line_setup.rs
@@ -119,10 +154,10 @@ index 8e98ab2b80..91e7bb9ef2 100644
              Self::TotalInputTokens,
              Self::TotalOutputTokens,
 diff --git a/codex-rs/tui/src/chatwidget/protocol.rs b/codex-rs/tui/src/chatwidget/protocol.rs
-index ba0d2e4061..2e2963045e 100644
+index ba0d2e4061..78709ef849 100644
 --- a/codex-rs/tui/src/chatwidget/protocol.rs
 +++ b/codex-rs/tui/src/chatwidget/protocol.rs
-@@ -44,6 +44,21 @@ impl ChatWidget {
+@@ -44,6 +44,25 @@ impl ChatWidget {
              self.restore_retry_status_header_if_present();
          }
          match notification {
@@ -133,6 +168,10 @@ index ba0d2e4061..2e2963045e 100644
 +                    .and_then(|usage| usage.metadata.as_ref())
 +                    .and_then(|metadata| metadata.get("_codex_session_api_seconds"))
 +                    .and_then(serde_json::Value::as_u64)
++                    && self
++                        .status_state
++                        .session_response_ids
++                        .insert(notification.response_id)
 +                {
 +                    self.status_state.session_api_seconds = self
 +                        .status_state
@@ -144,7 +183,7 @@ index ba0d2e4061..2e2963045e 100644
              ServerNotification::ThreadTokenUsageUpdated(notification) => {
                  self.set_token_info(Some(token_usage_info_from_app_server(
                      notification.token_usage,
-@@ -352,7 +367,6 @@ impl ChatWidget {
+@@ -352,7 +371,6 @@ impl ChatWidget {
              | ServerNotification::ThreadUnarchived(_)
              | ServerNotification::ThreadAttachmentUpdated(_)
              | ServerNotification::RawResponseItemCompleted(_)
@@ -152,28 +191,115 @@ index ba0d2e4061..2e2963045e 100644
              | ServerNotification::CommandExecOutputDelta(_)
              | ServerNotification::ProcessOutputDelta(_)
              | ServerNotification::ProcessExited(_)
+diff --git a/codex-rs/tui/src/chatwidget/session_flow.rs b/codex-rs/tui/src/chatwidget/session_flow.rs
+index 3a3a68c304..579246bea5 100644
+--- a/codex-rs/tui/src/chatwidget/session_flow.rs
++++ b/codex-rs/tui/src/chatwidget/session_flow.rs
+@@ -68,6 +68,14 @@ impl ChatWidget {
+         self.set_skills(/*skills*/ None);
+         self.session_network_proxy = session.network_proxy.clone();
+         let previous_thread_id = self.thread_id;
++        if previous_thread_id != Some(session.thread_id) {
++            if let Err(err) = self
++                .status_state
++                .restore_session_time(session.rollout_path.as_deref())
++            {
++                tracing::warn!(error = %err, "failed to restore session time");
++            }
++        }
+         let connector_scope_changed = previous_thread_id != Some(session.thread_id)
+             || self.config.cwd.as_path() != session.cwd.as_path();
+         self.thread_id = Some(session.thread_id);
 diff --git a/codex-rs/tui/src/chatwidget/status_state.rs b/codex-rs/tui/src/chatwidget/status_state.rs
-index 5fe1eba3da..fe54157078 100644
+index 5fe1eba3da..5721e767f2 100644
 --- a/codex-rs/tui/src/chatwidget/status_state.rs
 +++ b/codex-rs/tui/src/chatwidget/status_state.rs
-@@ -123,6 +123,7 @@ pub(super) struct StatusState {
+@@ -1,6 +1,11 @@
+ //! Status indicator and terminal-title state for `ChatWidget`.
+ 
+ use crate::status_indicator_widget::STATUS_DETAILS_DEFAULT_MAX_LINES;
++use codex_protocol::protocol::EventMsg;
++use codex_rollout::RolloutItem;
++use std::io;
++use std::io::BufRead;
++use std::path::Path;
+ 
+ #[derive(Clone, Debug, PartialEq, Eq)]
+ pub(super) struct StatusIndicatorState {
+@@ -123,6 +128,9 @@ pub(super) struct StatusState {
      pub(super) retry_status_header: Option<String>,
      pub(super) pending_status_indicator_restore: bool,
      pub(super) thread_title_generation_pending: bool,
 +    pub(super) session_api_seconds: u64,
++    pub(super) session_started_at: Option<i64>,
++    pub(super) session_response_ids: std::collections::HashSet<String>,
  }
  
  impl Default for StatusState {
-@@ -138,6 +139,7 @@ impl Default for StatusState {
+@@ -138,11 +146,61 @@ impl Default for StatusState {
              retry_status_header: None,
              pending_status_indicator_restore: false,
              thread_title_generation_pending: false,
 +            session_api_seconds: 0,
++            session_started_at: None,
++            session_response_ids: std::collections::HashSet::new(),
          }
      }
  }
+ 
+ impl StatusState {
++    pub(super) fn restore_session_time(&mut self, rollout_path: Option<&Path>) -> io::Result<()> {
++        self.session_started_at = None;
++        self.session_api_seconds = 0;
++        self.session_response_ids.clear();
++        let Some(path) = rollout_path else {
++            return Ok(());
++        };
++        let file = codex_rollout::open_rollout_seekable_reader(path)?;
++        let mut saw_session_meta = false;
++        for line in std::io::BufReader::new(file).lines() {
++            let line = line?;
++            if !line.contains("\"session_meta\"") && !line.contains("\"raw_response_completed\"") {
++                continue;
++            }
++            let item = match codex_rollout::parse_rollout_line(&line) {
++                Ok(line) => line.item,
++                Err(err) => {
++                    tracing::warn!(path = %path.display(), error = %err, "invalid session time record");
++                    continue;
++                }
++            };
++            match item {
++                RolloutItem::SessionMeta(meta) if !saw_session_meta => {
++                    saw_session_meta = true;
++                    match chrono::DateTime::parse_from_rfc3339(&meta.meta.timestamp) {
++                        Ok(started_at) => self.session_started_at = Some(started_at.timestamp()),
++                        Err(err) => tracing::warn!(error = %err, "invalid session start timestamp"),
++                    }
++                }
++                RolloutItem::EventMsg(EventMsg::RawResponseCompleted(event)) => {
++                    if let Some(seconds) = event
++                        .usage_metadata
++                        .as_ref()
++                        .and_then(|usage| usage.metadata.as_ref())
++                        .and_then(|metadata| metadata.get("_codex_session_api_seconds"))
++                        .and_then(serde_json::Value::as_u64)
++                        && self.session_response_ids.insert(event.response_id)
++                    {
++                        self.session_api_seconds = self.session_api_seconds.saturating_add(seconds);
++                    }
++                }
++                _ => {}
++            }
++        }
++        Ok(())
++    }
++
+     pub(super) fn set_status(&mut self, status: StatusIndicatorState) {
+         self.current_status = status;
+     }
 diff --git a/codex-rs/tui/src/chatwidget/status_surfaces.rs b/codex-rs/tui/src/chatwidget/status_surfaces.rs
-index 61b15b2f38..db6a136742 100644
+index 61b15b2f38..3f19852f30 100644
 --- a/codex-rs/tui/src/chatwidget/status_surfaces.rs
 +++ b/codex-rs/tui/src/chatwidget/status_surfaces.rs
 @@ -258,7 +258,13 @@ impl ChatWidget {
@@ -204,12 +330,20 @@ index 61b15b2f38..db6a136742 100644
          self.refresh_terminal_title_from_selections(&selections);
      }
  
-@@ -783,6 +795,29 @@ impl ChatWidget {
+@@ -783,6 +795,37 @@ impl ChatWidget {
                  let window = format_tokens_compact(self.status_line_context_window_size()?);
                  Some(format!("{used}/{window}").to_ascii_lowercase())
              }
 +            StatusLineItem::SessionTime => {
-+                let wall = self.terminal_title_animation_origin.elapsed().as_secs();
++                let wall = self.status_state.session_started_at.map_or_else(
++                    || self.terminal_title_animation_origin.elapsed().as_secs(),
++                    |started_at| {
++                        chrono::Utc::now()
++                            .timestamp()
++                            .saturating_sub(started_at)
++                            .max(0) as u64
++                    },
++                );
 +                let api = self.status_state.session_api_seconds;
 +                let format_time = |seconds: u64| {
 +                    [
@@ -234,7 +368,7 @@ index 61b15b2f38..db6a136742 100644
              StatusLineItem::TotalInputTokens => (!self.token_usage_pending).then(|| {
                  format!(
                      "{} in",
-@@ -868,6 +903,7 @@ impl ChatWidget {
+@@ -868,6 +911,7 @@ impl ChatWidget {
              StatusSurfacePreviewItem::CodexVersion => StatusLineItem::CodexVersion,
              StatusSurfacePreviewItem::ContextWindowSize => StatusLineItem::ContextWindowSize,
              StatusSurfacePreviewItem::ContextWindowUsage => StatusLineItem::ContextWindowUsage,
@@ -242,16 +376,3 @@ index 61b15b2f38..db6a136742 100644
              StatusSurfacePreviewItem::UsedTokens => StatusLineItem::UsedTokens,
              StatusSurfacePreviewItem::TotalInputTokens => StatusLineItem::TotalInputTokens,
              StatusSurfacePreviewItem::TotalOutputTokens => StatusLineItem::TotalOutputTokens,
-diff --git a/codex-rs/app-server/src/request_processors/thread_lifecycle.rs b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
-index b0fa49b4ba..0309ff4007 100644
---- a/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
-+++ b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
-@@ -327,7 +327,7 @@ pub(super) async fn ensure_listener_task_running(
-                     };
-                     if matches!(
-                         &event.msg,
--                        EventMsg::RawResponseItem(_) | EventMsg::RawResponseCompleted(_)
-+                        EventMsg::RawResponseItem(_)
-                     ) && !raw_events_enabled
-                     {
-                         continue;
