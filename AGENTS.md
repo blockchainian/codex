@@ -32,6 +32,17 @@ To change an existing patch, recreate the baseline before it and amend that patc
 - `git clone --recurse-submodules https://github.com/blockchainian/codex.git` — clones the repo with the submodule
 - `git submodule update --init official` — fetches the submodule in an existing clone
 
+### Upgrade official Codex
+
+1. `git -C official fetch origin main`, then `git -C official checkout --detach origin/main`.
+2. `./scripts/check-patches.sh`; a conflict leaves `.worktrees/check-patches` for inspection. Repair the patch.
+3. Commit `official` and `patches` together, then `./scripts/build.sh`.
+
+> **Warning**
+>
+> - Never run `git submodule update --remote`; builds must use the committed pointer
+> - To abandon an upgrade, preserve any changes, then run `git submodule update official`
+
 ### Develop a patch
 
 - `./scripts/develop.sh` — creates the development worktree in `.worktrees/develop`, with all patches committed as the baseline
@@ -59,17 +70,6 @@ The build needs a clean repository and a clean `official/` at the committed poin
 > - Successful publication cleans only the build worktree, after a successful daemon restart when binaries or links changed
 > - Failures preserve diagnostic state; inspect or save it before retrying
 > - Never use broad cleanup against a development worktree
-
-### Upgrade official Codex
-
-1. `git -C official fetch origin main`, then `git -C official checkout --detach origin/main`.
-2. `./scripts/check-patches.sh`; a conflict leaves `.worktrees/check-patches` for inspection. Repair the patch.
-3. Commit `official` and `patches` together, then `./scripts/build.sh`.
-
-> **Warning**
->
-> - Never run `git submodule update --remote`; builds must use the committed pointer
-> - To abandon an upgrade, preserve any changes, then run `git submodule update official`
 
 ## Checks
 
