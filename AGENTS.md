@@ -48,7 +48,7 @@ To change an existing patch, recreate the baseline before it and amend that patc
 ### Build and publish
 
 - `./scripts/build.sh` — builds the committed submodule version in `.worktrees/build` and publishes it, sharing the `official/codex-rs/target` cache
-- `cat ~/.codex/log/customized-daemon-restart.log` — shows the final result: `COMPLETE`, `FAILED`, or `TIMEOUT`
+- `cat ~/.codex/app-server-daemon/customized-app-server.stderr.log` — shows the final result: `COMPLETE`, `FAILED`, or `TIMEOUT`
 
 The build needs a clean repository and a clean `official/` at the committed pointer. It takes the package version from the latest stable official release tag, and publishes the binaries to `~/.local/share/codex-customized/bin`.
 

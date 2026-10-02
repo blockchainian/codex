@@ -78,7 +78,7 @@ if [[ "$changed" == true ]]; then
 else
     echo "Already published: $version"
 fi
-restart_log="$HOME/.codex/log/customized-daemon-restart.log"
+restart_log="$HOME/.codex/app-server-daemon/customized-app-server.stderr.log"
 mkdir -p "$(dirname "$restart_log")"
 (
     cd "$HOME/Code"
