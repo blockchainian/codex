@@ -34,23 +34,18 @@ To change an existing patch, recreate the baseline before it and amend that patc
 
 ### Develop a patch
 
-- `./scripts/develop.sh` — creates the development worktree in `.worktrees/develop`, with all patches committed as the baseline
-- `git add <feature-files>` — stages the feature in the worktree root, including new files and snapshot updates
-- `git diff --binary --cached HEAD > ../../patches/<NNNN>-<name>.patch` — exports the staged feature as a patch
-- `./scripts/check-patches.sh` — checks that all patches apply in order
-
 > **Warning**
 >
 > - Keep `official/` clean; develop only in the worktree created by `scripts/develop.sh`
 > - Export before committing in the worktree, so `HEAD` still names the patched baseline
 > - If other patches changed while you were developing, test the complete stack in a fresh worktree
 
+- `./scripts/develop.sh` — creates the development worktree in `.worktrees/develop`, with all patches committed as the baseline
+- `git add <feature-files>` — stages the feature in the worktree root, including new files and snapshot updates
+- `git diff --binary --cached HEAD > ../../patches/<NNNN>-<name>.patch` — exports the staged feature as a patch
+- `./scripts/check-patches.sh` — checks that all patches apply in order
+
 ### Build and publish
-
-- `./scripts/build.sh` — builds the committed submodule version in `.worktrees/build` and publishes it, sharing the `official/codex-rs/target` cache
-- `cat ~/.codex/log/customized-daemon-restart.log` — shows the final result: `COMPLETE`, `FAILED`, or `TIMEOUT`
-
-The build needs a clean repository and a clean `official/` at the committed pointer. It takes the package version from the latest stable official release tag, and publishes the binaries to `~/.local/share/codex-customized/bin`.
 
 > **Warning**
 >
@@ -60,16 +55,21 @@ The build needs a clean repository and a clean `official/` at the committed poin
 > - Failures preserve diagnostic state; inspect or save it before retrying
 > - Never use broad cleanup against a development worktree
 
-### Upgrade official Codex
+- `./scripts/build.sh` — builds the committed submodule version in `.worktrees/build` and publishes it, sharing the `official/codex-rs/target` cache
+- `cat ~/.codex/log/customized-daemon-restart.log` — shows the final result: `COMPLETE`, `FAILED`, or `TIMEOUT`
 
-1. `git -C official fetch origin main`, then `git -C official checkout --detach origin/main`.
-2. `./scripts/check-patches.sh`; a conflict leaves `.worktrees/check-patches` for inspection. Repair the patch.
-3. Commit `official` and `patches` together, then `./scripts/build.sh`.
+The build needs a clean repository and a clean `official/` at the committed pointer. It takes the package version from the latest stable official release tag, and publishes the binaries to `~/.local/share/codex-customized/bin`.
+
+### Upgrade official Codex
 
 > **Warning**
 >
 > - Never run `git submodule update --remote`; builds must use the committed pointer
 > - To abandon an upgrade, preserve any changes, then run `git submodule update official`
+
+1. `git -C official fetch origin main`, then `git -C official checkout --detach origin/main`.
+2. `./scripts/check-patches.sh`; a conflict leaves `.worktrees/check-patches` for inspection. Repair the patch.
+3. Commit `official` and `patches` together, then `./scripts/build.sh`.
 
 ## Checks
 
