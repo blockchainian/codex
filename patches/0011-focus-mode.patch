@@ -1,15 +1,16 @@
 diff --git a/codex-rs/tui/src/app/history_ui.rs b/codex-rs/tui/src/app/history_ui.rs
-index 52e7e0203e..41cdf44a6c 100644
+index 52e7e0203e..8548115fa5 100644
 --- a/codex-rs/tui/src/app/history_ui.rs
 +++ b/codex-rs/tui/src/app/history_ui.rs
-@@ -21,7 +21,31 @@ pub(super) struct ThreadUsageStatusHistory {
+@@ -21,7 +21,32 @@ pub(super) struct ThreadUsageStatusHistory {
      pub(super) lines: Vec<HyperlinkLine>,
  }
  
 +/// Tool activity that focus mode keeps out of the main view; the transcript still retains it.
 +fn is_hidden_activity(cell: &dyn HistoryCell) -> bool {
 +    let cell = cell.as_any();
-+    cell.is::<crate::exec_cell::ExecCell>()
++    cell.downcast_ref::<crate::exec_cell::ExecCell>()
++        .is_some_and(|cell| !cell.iter_calls().any(|call| call.is_user_shell_command()))
 +        || cell.is::<history_cell::PatchHistoryCell>()
 +        || cell.is::<history_cell::ViewImageHistoryCell>()
 +        || cell.is::<history_cell::McpToolCallCell>()
@@ -34,7 +35,7 @@ index 52e7e0203e..41cdf44a6c 100644
      pub(super) fn insert_history_cell(&mut self, tui: &mut tui::Tui, cell: Box<dyn HistoryCell>) {
          // Global deprecations can be delivered again by hidden threads. Scope deduplication to
          // retained history so clearing or rebuilding a transcript can show the notice again.
-@@ -80,7 +104,7 @@ impl App {
+@@ -80,7 +105,7 @@ impl App {
          // Owned replay must not eagerly format every historical entry. Composite status cards are
          // the only committed cells whose mutable usage data needs insertion-time bookkeeping.
          let lines = if !deferred || cell.as_any().is::<history_cell::CompositeHistoryCell>() {
