@@ -39,7 +39,7 @@ Keep patches focused. Do not put generated workspace version or lockfile changes
 ## Checks
 
 - **patches**: `./scripts/check-patches.sh`
-- **Codex behavior**: the relevant upstream tests
+- **Codex**: the relevant upstream tests
 
 Keep this repository's own checks minimal.
 
