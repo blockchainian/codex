@@ -27,7 +27,7 @@ To change an existing patch, recreate the baseline before it and amend that patc
 
 ## Tools
 
-### Official Codex
+### Set up and upgrade official Codex
 
 - `git clone --recurse-submodules https://github.com/blockchainian/codex.git` — clones the repo with the submodule
 - `git submodule update --init official` — fetches the submodule in an existing clone
