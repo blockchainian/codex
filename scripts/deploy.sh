@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/.." && pwd)"
 source_root="$repo_root/.worktrees/build"
 official_root="$repo_root/official"
 
-fail() { echo "build.sh: $*" >&2; exit 1; }
+fail() { echo "deploy.sh: $*" >&2; exit 1; }
 
 cd "$repo_root"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "commit repository changes before building"
@@ -118,4 +118,4 @@ for binary in codex codex-code-mode-host codex-responses-api-proxy; do
     echo "$path"
 done
 
-"$script_dir/publish.sh" "$CARGO_TARGET_DIR/release" "$source_root"
+"$script_dir/install.sh" "$CARGO_TARGET_DIR/release" "$source_root"

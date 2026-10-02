@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source_dir="${1:?usage: publish.sh RELEASE_DIR BUILD_WORKTREE}"
-build_dir="${2:?usage: publish.sh RELEASE_DIR BUILD_WORKTREE}"
+source_dir="${1:?usage: install.sh RELEASE_DIR BUILD_WORKTREE}"
+build_dir="${2:?usage: install.sh RELEASE_DIR BUILD_WORKTREE}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 install_dir="$HOME/.local/share/codex-customized/bin"
 legacy_dir="$HOME/Code/blockchainian/dot/darwin/bin"
@@ -12,7 +12,7 @@ staged=()
 copy_temps=()
 copy_names=()
 
-fail() { echo "publish.sh: $*" >&2; exit 1; }
+fail() { echo "install.sh: $*" >&2; exit 1; }
 cleanup() {
     for path in "${staged[@]-}"; do
         [[ -n "$path" ]] || continue
@@ -73,16 +73,16 @@ done
 
 finish_args=(--codex "$install_dir/codex" --worktree "$build_dir")
 if [[ "$changed" == true ]]; then
-    echo "Published $version to $install_dir"
+    echo "Installed $version to $install_dir"
     finish_args+=(--restart)
 else
-    echo "Already published: $version"
+    echo "Already installed: $version"
 fi
 restart_log="$HOME/.codex/app-server-daemon/customized-app-server.stderr.log"
 mkdir -p "$(dirname "$restart_log")"
 (
     cd "$HOME/Code"
-    nohup "$script_dir/finish-build.sh" "${finish_args[@]}" \
+    nohup "$script_dir/restart-daemon.sh" "${finish_args[@]}" \
         </dev/null >"$restart_log" 2>&1 &
 )
 echo "Completion task started; final COMPLETE, FAILED, or TIMEOUT result: $restart_log"

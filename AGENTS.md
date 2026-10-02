@@ -9,7 +9,7 @@ This repo is `blockchainian/codex`, personal patches and build tooling for OpenA
 ## Modules
 
 - patches/ -- ordered personal patches
-- scripts/ -- develop, check, build, and publish tools
+- scripts/ -- develop, check, and deploy tools
 - official/ -- the `https://github.com/openai/codex.git` submodule; its committed pointer is the build baseline
 - .worktrees/ -- disposable worktrees: `build`, `develop`, `check-patches`
 
@@ -38,7 +38,7 @@ To change an existing patch, recreate the baseline before it and amend that patc
 - `git -C official checkout --detach origin/main` — moves the submodule to them
 - `./scripts/check-patches.sh` — checks the patches against the new baseline; a conflict leaves `.worktrees/check-patches` for inspection
 - `git add official patches` — stages the pointer and the repaired patches for one commit
-- `./scripts/build.sh` — builds and publishes the upgraded version
+- `./scripts/deploy.sh` — builds, installs, and starts the upgraded version
 
 > **Warning**
 >
@@ -58,18 +58,18 @@ To change an existing patch, recreate the baseline before it and amend that patc
 > - Export before committing in the worktree, so `HEAD` still names the patched baseline
 > - If other patches changed while you were developing, test the complete stack in a fresh worktree
 
-### Build and publish
+### Deploy
 
-- `./scripts/build.sh` — builds the committed submodule version in `.worktrees/build` and publishes it, sharing the `official/codex-rs/target` cache
+- `./scripts/deploy.sh` — builds the committed submodule version in `.worktrees/build`, installs it, and restarts the daemon, sharing the `official/codex-rs/target` cache
 - `cat ~/.codex/app-server-daemon/customized-app-server.stderr.log` — shows the final result: `COMPLETE`, `FAILED`, or `TIMEOUT`
 
-The build needs a clean repository and a clean `official/` at the committed pointer. It takes the package version from the latest stable official release tag, and publishes the binaries to `~/.local/share/codex-customized/bin`.
+The deploy needs a clean repository and a clean `official/` at the committed pointer. It takes the package version from the latest stable official release tag, and installs the binaries to `~/.local/share/codex-customized/bin`.
 
 > **Warning**
 >
-> - Never edit a worktree during an active build
-> - Do not start another build until the log shows a result; the daemon restart runs detached, with a 120-second deadline
-> - Successful publication cleans only the build worktree, after a successful daemon restart when binaries or links changed
+> - Never edit a worktree during an active deploy
+> - Do not start another deploy until the log shows a result; the daemon restart runs detached, with a 120-second deadline
+> - A successful deploy cleans only the build worktree, after a successful daemon restart when binaries or links changed
 > - Failures preserve diagnostic state; inspect or save it before retrying
 > - Never use broad cleanup against a development worktree
 
