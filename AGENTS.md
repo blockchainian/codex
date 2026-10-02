@@ -38,7 +38,6 @@ Keep patches focused. Do not put generated workspace version or lockfile changes
 
 ## Checks
 
-- **scripts**: `bash -n scripts/<name>.sh` for each script — checks syntax only, does not run it
 - **patches**: `./scripts/check-patches.sh`
 - **Codex behavior**: the relevant upstream tests
 
