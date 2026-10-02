@@ -19,3 +19,24 @@ index 27b1950d0a..9a30ac5a03 100644
              area.y = screen_size.height - area.height;
          }
  
+diff --git a/codex-rs/tui/src/app.rs b/codex-rs/tui/src/app.rs
+index 69dd396284..36c98b2219 100644
+--- a/codex-rs/tui/src/app.rs
++++ b/codex-rs/tui/src/app.rs
+@@ -1166,12 +1166,12 @@ impl App {
+             &mut self.agents_overview.rendered_full_screen,
+             dashboard_visible,
+         );
+-        // Full-height inline overlays scroll history off screen without a terminal resize.
+-        // Rebuild it once when returning to a content-height chat viewport.
++        // Shrinking a bottom-aligned viewport exposes cleared rows above it.
++        // Rebuild history so those rows do not become gaps in scrollback.
+         let restoring_inline_viewport = !tui.is_alt_screen_active()
+-            && tui.terminal.viewport_area.height == screen_size.height
++            && tui.terminal.viewport_area.bottom() == screen_size.height
+             && self.with_chat_widget_frame(screen_size.width, |height, _| height)
+-                < screen_size.height;
++                < tui.terminal.viewport_area.height;
+         if !dashboard_visible && (dashboard_was_visible || restoring_inline_viewport) {
+             self.schedule_immediate_resize_reflow(tui);
+             self.maybe_run_resize_reflow(tui, screen_size)?;
