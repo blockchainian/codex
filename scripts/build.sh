@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-source_root="$repo_root/.work/build"
+source_root="$repo_root/.worktrees/build"
 official_root="$repo_root/official"
 
 fail() { echo "build.sh: $*" >&2; exit 1; }
@@ -15,7 +15,7 @@ cd "$official_root"
 [[ "$(git rev-parse HEAD)" == "$commit" ]] || fail "official does not match the committed submodule pointer"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "official must be clean"
 common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
-mkdir -p "$repo_root/.work"
+mkdir -p "$repo_root/.worktrees"
 if [[ -e "$source_root" ]]; then
     cd "$source_root"
     [[ "$(git rev-parse --show-toplevel)" == "$source_root" ]] || fail "unexpected build worktree location"

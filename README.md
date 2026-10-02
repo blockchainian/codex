@@ -24,7 +24,7 @@ Install the prerequisites listed by the official source repository. Publication
 uses the existing macOS CLI and standalone installation locations.
 
 The build requires a clean parent repository and clean submodule at the committed
-pointer. It applies the patches in `.work/build`, sets the package version from
+pointer. It applies the patches in `.worktrees/build`, sets the package version from
 the latest stable official release tag, and builds three release binaries using
 `official/codex-rs/target` as the shared cache. Outputs are copied to
 `~/.local/share/codex-customized/bin` and the existing installation links updated.
@@ -41,7 +41,7 @@ cat ~/.codex/log/customized-daemon-restart.log
 `COMPLETE` means publication finished and the source is clean. `FAILED` or
 `TIMEOUT` means inspection is required; source is preserved after a failed
 restart. Do not start another build until the completion task has finished.
-Patch or compile failures also preserve `.work/build`; inspect or save the
+Patch or compile failures also preserve `.worktrees/build`; inspect or save the
 changes before restoring that disposable worktree and retrying.
 
 ## Upgrade official Codex
@@ -73,7 +73,7 @@ upgrade, first preserve any changes, then run `git submodule update official`.
 
 ```sh
 ./scripts/develop.sh
-cd .work/develop/codex-rs
+cd .worktrees/develop/codex-rs
 ```
 
 This creates a detached development worktree at the committed official version,

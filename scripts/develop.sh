@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-worktree="${1:-$repo_root/.work/develop}"
+worktree="${1:-$repo_root/.worktrees/develop}"
 [[ "$worktree" = /* ]] || worktree="$PWD/$worktree"
 
 [[ ! -e "$worktree" ]] || { echo "Worktree already exists: $worktree" >&2; exit 1; }

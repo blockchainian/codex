@@ -11,7 +11,7 @@ This repo is `blockchainian/codex`, personal patches and build tooling for OpenA
 - patches/ -- ordered personal patches
 - scripts/ -- develop, check, build, and publish tools
 - official/ -- the `https://github.com/openai/codex.git` submodule; its committed pointer is the build baseline
-- .work/ -- disposable worktrees: `build`, `develop`, `check-patches`
+- .worktrees/ -- disposable worktrees: `build`, `develop`, `check-patches`
 
 Keep only personal patches, workflow scripts, and their documentation here. Never import upstream source or history.
 
@@ -25,9 +25,9 @@ Keep patches focused. Do not put generated workspace version or lockfile changes
 
 ## Tools
 
-- `./scripts/develop.sh` — creates the patched development worktree in `.work/develop`
+- `./scripts/develop.sh` — creates the patched development worktree in `.worktrees/develop`
 - `./scripts/check-patches.sh` — checks that all patches apply in order
-- `./scripts/build.sh` — builds the committed submodule version in `.work/build` and publishes it, sharing the `official/codex-rs/target` cache
+- `./scripts/build.sh` — builds the committed submodule version in `.worktrees/build` and publishes it, sharing the `official/codex-rs/target` cache
 
 > **Warning**
 >
@@ -38,7 +38,7 @@ Keep patches focused. Do not put generated workspace version or lockfile changes
 
 ## Checks
 
-- **scripts**: `bash -n` on each `scripts/*.sh` file
+- **scripts**: `bash -n scripts/<name>.sh` for each script — checks syntax only, does not run it
 - **patches**: `./scripts/check-patches.sh`
 - **Codex behavior**: the relevant upstream tests
 

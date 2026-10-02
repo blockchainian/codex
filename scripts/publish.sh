@@ -24,7 +24,7 @@ cleanup() {
 trap cleanup EXIT
 
 [[ "$(uname -s)" == Darwin ]] || fail "macOS required"
-[[ "$build_dir" == "$(cd "$script_dir/.." && pwd)/.work/build" ]] || fail "unexpected build worktree: $build_dir"
+[[ "$build_dir" == "$(cd "$script_dir/.." && pwd)/.worktrees/build" ]] || fail "unexpected build worktree: $build_dir"
 [[ -d "$source_dir" ]] || fail "release directory missing: $source_dir"
 for binary in "${binaries[@]}"; do
     [[ -x "$source_dir/$binary" ]] || fail "missing binary: $source_dir/$binary"

@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$codex" && -n "$worktree" ]] || fail "--codex and --worktree are required"
 worktree="$(cd "$worktree" && pwd -P)"
-[[ "$worktree" == "$repo_root/.work/build" ]] || fail "unexpected build worktree: $worktree"
+[[ "$worktree" == "$repo_root/.worktrees/build" ]] || fail "unexpected build worktree: $worktree"
 
 cd "$repo_root/official"
 official_common="$(git rev-parse --path-format=absolute --git-common-dir)"
