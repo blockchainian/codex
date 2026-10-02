@@ -34,9 +34,11 @@ To change an existing patch, recreate the baseline before it and amend that patc
 
 To upgrade:
 
-1. `git -C official fetch origin main`, then `git -C official checkout --detach origin/main`.
-2. `./scripts/check-patches.sh`; a conflict leaves `.worktrees/check-patches` for inspection. Repair the patch.
-3. Commit `official` and `patches` together, then `./scripts/build.sh`.
+- `git -C official fetch origin main` — fetches the latest official commits
+- `git -C official checkout --detach origin/main` — moves the submodule to them
+- `./scripts/check-patches.sh` — checks the patches against the new baseline; a conflict leaves `.worktrees/check-patches` for inspection
+- `git add official patches` — stages the pointer and the repaired patches for one commit
+- `./scripts/build.sh` — builds and publishes the upgraded version
 
 > **Warning**
 >
