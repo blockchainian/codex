@@ -1,8 +1,8 @@
 diff --git a/codex-rs/tui/src/bottom_pane/chat_composer.rs b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-index ff4e78b37a..c7655c0b58 100644
+index 7a36cd9959..db261dcaee 100644
 --- a/codex-rs/tui/src/bottom_pane/chat_composer.rs
 +++ b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-@@ -372,7 +372,6 @@ use crate::render::Insets;
+@@ -362,7 +362,6 @@ use crate::render::Insets;
  use crate::render::RectExt;
  use crate::render::renderable::Renderable;
  use crate::slash_command::SlashCommand;
@@ -10,7 +10,7 @@ index ff4e78b37a..c7655c0b58 100644
  use codex_protocol::ThreadId;
  use codex_protocol::user_input::ByteRange;
  use codex_protocol::user_input::MAX_USER_INPUT_TEXT_CHARS;
-@@ -4902,12 +4901,16 @@ impl ChatComposer {
+@@ -4800,8 +4799,13 @@ impl ChatComposer {
          if let Some((warning_area, line)) = warning_notice {
              line.render(warning_area, buf);
          }
@@ -24,15 +24,17 @@ index ff4e78b37a..c7655c0b58 100644
 +            buf.set_string(composer_rect.x, composer_rect.bottom() - 1, &rule, style);
 +        }
          if !remote_images_rect.is_empty() {
--            Paragraph::new(self.attachments.remote_image_lines())
--                .style(style)
--                .render(remote_images_rect, buf);
-+            (&Paragraph::new(self.attachments.remote_image_lines()))
-+                .render_ref(remote_images_rect, buf);
+             let first = self
+                 .attachments
+@@ -4815,7 +4819,6 @@ impl ChatComposer {
+                     .skip(first)
+                     .collect::<Vec<_>>(),
+             )
+-            .style(style)
+             .render(remote_images_rect, buf);
          }
          if !textarea_rect.is_empty() {
-             let prompt = if self.draft.input_enabled {
-@@ -4915,7 +4918,7 @@ impl ChatComposer {
+@@ -4824,7 +4827,7 @@ impl ChatComposer {
                      Span::from("!").light_red().bold()
                  } else if self.luna_reserve_active {
                      // Reserve keeps one arrow at every reasoning effort; only its foreground changes.
@@ -41,7 +43,7 @@ index ff4e78b37a..c7655c0b58 100644
                          .fg(crate::terminal_palette::best_color((246, 197, 67)))
                          .bold()
                  } else if let Some(tier) = self.effort_tier {
-@@ -4926,10 +4929,10 @@ impl ChatComposer {
+@@ -4835,10 +4838,10 @@ impl ChatComposer {
                          .unwrap_or(1.0);
                      tier.prompt(charge)
                  } else {
@@ -55,10 +57,10 @@ index ff4e78b37a..c7655c0b58 100644
              buf.set_span(
                  textarea_rect.x - LIVE_PREFIX_COLS,
 diff --git a/codex-rs/tui/src/bottom_pane/chat_composer/inline_input.rs b/codex-rs/tui/src/bottom_pane/chat_composer/inline_input.rs
-index 9022ab4f77..63cc57c8fc 100644
+index 48f7adff59..aa3039286c 100644
 --- a/codex-rs/tui/src/bottom_pane/chat_composer/inline_input.rs
 +++ b/codex-rs/tui/src/bottom_pane/chat_composer/inline_input.rs
-@@ -5,6 +5,7 @@
+@@ -6,6 +6,7 @@
  
  use super::super::textarea::VimPersistentState;
  use super::*;

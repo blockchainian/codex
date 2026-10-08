@@ -70,20 +70,6 @@ index a13b8a674f..baf296f8ad 100644
          };
          let tab = Rect::new(x, area.y, width, /*height*/ 1);
          line.render(tab, buf);
-diff --git a/codex-rs/tui/src/style.rs b/codex-rs/tui/src/style.rs
-index b9f6d45155..f02b4f6bfa 100644
---- a/codex-rs/tui/src/style.rs
-+++ b/codex-rs/tui/src/style.rs
-@@ -17,7 +17,8 @@ use ratatui::style::Style;
- 
- const LIGHT_BG_ACCENT_RGB: (u8, u8, u8) = (28, 100, 200);
- 
--/// ChatGPT Blue 100 (#A4CDFB), used for selection fills on light backgrounds.
-+/// ChatGPT Blue 100 (#A4CDFB).
-+#[cfg(test)]
- pub(crate) const CHATGPT_BLUE_100: (u8, u8, u8) = (164, 205, 251);
- 
- /// ChatGPT Blue 200 (#63A8F8).
 diff --git a/codex-rs/tui/src/style/contrast.rs b/codex-rs/tui/src/style/contrast.rs
 index 8400f6ddea..d93729aa89 100644
 --- a/codex-rs/tui/src/style/contrast.rs

@@ -1,8 +1,8 @@
 diff --git a/codex-rs/app-server/src/request_processors/thread_lifecycle.rs b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
-index b0fa49b4ba..0309ff4007 100644
+index 4418577ee6..92f965f6c4 100644
 --- a/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
 +++ b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
-@@ -327,7 +327,7 @@ pub(super) async fn ensure_listener_task_running(
+@@ -348,7 +348,7 @@ pub(super) async fn ensure_listener_task_running(
                      };
                      if matches!(
                          &event.msg,
@@ -12,7 +12,7 @@ index b0fa49b4ba..0309ff4007 100644
                      {
                          continue;
 diff --git a/codex-rs/codex-api/src/sse/responses.rs b/codex-rs/codex-api/src/sse/responses.rs
-index c01b13f1fe..6721d1d4c8 100644
+index 78885f43de..dc966acdf2 100644
 --- a/codex-rs/codex-api/src/sse/responses.rs
 +++ b/codex-rs/codex-api/src/sse/responses.rs
 @@ -107,6 +107,8 @@ pub fn spawn_response_stream(
@@ -24,7 +24,7 @@ index c01b13f1fe..6721d1d4c8 100644
      #[serde(default)]
      usage: Option<ResponseCompletedUsage>,
      usage_metadata: Option<ResponseUsageMetadata>,
-@@ -440,6 +442,20 @@ pub fn process_responses_event(
+@@ -443,6 +445,20 @@ pub fn process_responses_event(
                          if let Some(metadata) = metadata {
                              resp.usage_metadata.get_or_insert_default().metadata = Some(metadata);
                          }
@@ -46,20 +46,20 @@ index c01b13f1fe..6721d1d4c8 100644
                              response_id: resp.id,
                              token_usage: resp.usage.map(Into::into),
 diff --git a/codex-rs/rollout/src/policy.rs b/codex-rs/rollout/src/policy.rs
-index c82b5ce958..a6abda92f7 100644
+index eb13ec553e..24a0a0f6bb 100644
 --- a/codex-rs/rollout/src/policy.rs
 +++ b/codex-rs/rollout/src/policy.rs
-@@ -116,7 +116,8 @@ pub fn should_persist_event_msg(ev: &EventMsg, history_mode: ThreadHistoryMode)
+@@ -136,7 +136,8 @@ fn persisted_event_msg(
          | EventMsg::TurnAborted(_)
          | EventMsg::TurnStarted(_)
          | EventMsg::TurnComplete(_)
--        | EventMsg::ThreadSettingsApplied(_) => true,
+-        | EventMsg::ThreadSettingsApplied(_) => Some(Cow::Borrowed(ev)),
 +        | EventMsg::ThreadSettingsApplied(_)
-+        | EventMsg::RawResponseCompleted(_) => true,
++        | EventMsg::RawResponseCompleted(_) => Some(Cow::Borrowed(ev)),
  
          // Only persist these legacy events when the thread's history mode is Legacy.
          // New, paginated rollouts persist ItemCompleted events with TurnItems.
-@@ -165,7 +166,6 @@ pub fn should_persist_event_msg(ev: &EventMsg, history_mode: ThreadHistoryMode)
+@@ -184,7 +185,6 @@ fn persisted_event_msg(
          | EventMsg::TurnModerationMetadata(_)
          | EventMsg::AgentReasoningSectionBreak(_)
          | EventMsg::RawResponseItem(_)
@@ -68,7 +68,7 @@ index c82b5ce958..a6abda92f7 100644
          | EventMsg::EnvironmentConnected(_)
          | EventMsg::EnvironmentDisconnected(_)
 diff --git a/codex-rs/tui/src/bottom_pane/status_line_setup.rs b/codex-rs/tui/src/bottom_pane/status_line_setup.rs
-index 2394d0c37b..dec5a6ebac 100644
+index 20eb7cb885..cadfcfd98f 100644
 --- a/codex-rs/tui/src/bottom_pane/status_line_setup.rs
 +++ b/codex-rs/tui/src/bottom_pane/status_line_setup.rs
 @@ -122,6 +122,9 @@ pub(crate) enum StatusLineItem {
@@ -81,7 +81,7 @@ index 2394d0c37b..dec5a6ebac 100644
      /// Total tokens used in the current session.
      UsedTokens,
  
-@@ -197,6 +200,7 @@ impl StatusLineItem {
+@@ -200,6 +203,7 @@ impl StatusLineItem {
                  "Total context window size in tokens (omitted when unknown)"
              }
              StatusLineItem::ContextWindowUsage => "Current context tokens / window size",
@@ -89,7 +89,7 @@ index 2394d0c37b..dec5a6ebac 100644
              StatusLineItem::UsedTokens => "Total tokens used in session (omitted when zero)",
              StatusLineItem::TotalInputTokens => "Total input tokens used in session",
              StatusLineItem::TotalOutputTokens => "Total output tokens used in session",
-@@ -243,6 +247,7 @@ impl StatusLineItem {
+@@ -247,6 +251,7 @@ impl StatusLineItem {
              StatusLineItem::CodexVersion => StatusSurfacePreviewItem::CodexVersion,
              StatusLineItem::ContextWindowSize => StatusSurfacePreviewItem::ContextWindowSize,
              StatusLineItem::ContextWindowUsage => StatusSurfacePreviewItem::ContextWindowUsage,
@@ -98,7 +98,7 @@ index 2394d0c37b..dec5a6ebac 100644
              StatusLineItem::TotalInputTokens => StatusSurfacePreviewItem::TotalInputTokens,
              StatusLineItem::TotalOutputTokens => StatusSurfacePreviewItem::TotalOutputTokens,
 diff --git a/codex-rs/tui/src/bottom_pane/status_line_style.rs b/codex-rs/tui/src/bottom_pane/status_line_style.rs
-index a54ee6c816..ab6f810132 100644
+index d7911af8d3..df925f65d5 100644
 --- a/codex-rs/tui/src/bottom_pane/status_line_style.rs
 +++ b/codex-rs/tui/src/bottom_pane/status_line_style.rs
 @@ -46,6 +46,7 @@ impl StatusLineAccent {
@@ -109,7 +109,7 @@ index a54ee6c816..ab6f810132 100644
              | StatusLineItem::UsedTokens
              | StatusLineItem::TotalInputTokens
              | StatusLineItem::TotalOutputTokens
-@@ -146,7 +147,14 @@ where
+@@ -148,7 +149,14 @@ where
          } else {
              style
          };
@@ -126,7 +126,7 @@ index a54ee6c816..ab6f810132 100644
  
      (!spans.is_empty()).then(|| Line::from(spans))
 diff --git a/codex-rs/tui/src/bottom_pane/status_surface_preview.rs b/codex-rs/tui/src/bottom_pane/status_surface_preview.rs
-index 8e98ab2b80..91e7bb9ef2 100644
+index 492544442c..ca366e4503 100644
 --- a/codex-rs/tui/src/bottom_pane/status_surface_preview.rs
 +++ b/codex-rs/tui/src/bottom_pane/status_surface_preview.rs
 @@ -28,6 +28,7 @@ pub(crate) enum StatusSurfacePreviewItem {
@@ -137,7 +137,7 @@ index 8e98ab2b80..91e7bb9ef2 100644
      UsedTokens,
      TotalInputTokens,
      TotalOutputTokens,
-@@ -66,6 +67,7 @@ impl StatusSurfacePreviewItem {
+@@ -67,6 +68,7 @@ impl StatusSurfacePreviewItem {
              StatusSurfacePreviewItem::CodexVersion => "0.0.0",
              StatusSurfacePreviewItem::ContextWindowSize => "0 window",
              StatusSurfacePreviewItem::ContextWindowUsage => "0/0",
@@ -145,7 +145,7 @@ index 8e98ab2b80..91e7bb9ef2 100644
              StatusSurfacePreviewItem::UsedTokens => "0 used",
              StatusSurfacePreviewItem::TotalInputTokens => "0 in",
              StatusSurfacePreviewItem::TotalOutputTokens => "0 out",
-@@ -104,6 +106,7 @@ impl StatusSurfacePreviewItem {
+@@ -106,6 +108,7 @@ impl StatusSurfacePreviewItem {
              Self::CodexVersion,
              Self::ContextWindowSize,
              Self::ContextWindowUsage,
@@ -154,13 +154,13 @@ index 8e98ab2b80..91e7bb9ef2 100644
              Self::TotalInputTokens,
              Self::TotalOutputTokens,
 diff --git a/codex-rs/tui/src/chatwidget/protocol.rs b/codex-rs/tui/src/chatwidget/protocol.rs
-index ba0d2e4061..4700acc856 100644
+index 85ea551334..cc5854efff 100644
 --- a/codex-rs/tui/src/chatwidget/protocol.rs
 +++ b/codex-rs/tui/src/chatwidget/protocol.rs
-@@ -44,6 +44,14 @@ impl ChatWidget {
-             self.restore_retry_status_header_if_present();
-         }
-         match notification {
+@@ -58,6 +58,14 @@ impl ChatWidget {
+                     );
+                 }
+             }
 +            ServerNotification::RawResponseCompleted(notification) => {
 +                if self.status_state.record_response(
 +                    notification.response_id,
@@ -172,7 +172,7 @@ index ba0d2e4061..4700acc856 100644
              ServerNotification::ThreadTokenUsageUpdated(notification) => {
                  self.set_token_info(Some(token_usage_info_from_app_server(
                      notification.token_usage,
-@@ -352,7 +360,6 @@ impl ChatWidget {
+@@ -367,7 +375,6 @@ impl ChatWidget {
              | ServerNotification::ThreadUnarchived(_)
              | ServerNotification::ThreadAttachmentUpdated(_)
              | ServerNotification::RawResponseItemCompleted(_)
@@ -181,10 +181,10 @@ index ba0d2e4061..4700acc856 100644
              | ServerNotification::ProcessOutputDelta(_)
              | ServerNotification::ProcessExited(_)
 diff --git a/codex-rs/tui/src/chatwidget/session_flow.rs b/codex-rs/tui/src/chatwidget/session_flow.rs
-index 3a3a68c304..02c6c5b45b 100644
+index 97c7de5be3..5ccfcbb691 100644
 --- a/codex-rs/tui/src/chatwidget/session_flow.rs
 +++ b/codex-rs/tui/src/chatwidget/session_flow.rs
-@@ -68,6 +68,11 @@ impl ChatWidget {
+@@ -69,6 +69,11 @@ impl ChatWidget {
          self.set_skills(/*skills*/ None);
          self.session_network_proxy = session.network_proxy.clone();
          let previous_thread_id = self.thread_id;
@@ -291,7 +291,7 @@ index 5fe1eba3da..0a728f9e57 100644
          self.current_status = status;
      }
 diff --git a/codex-rs/tui/src/chatwidget/status_surfaces.rs b/codex-rs/tui/src/chatwidget/status_surfaces.rs
-index 61b15b2f38..5d218e2e1c 100644
+index 2aa3d9baf5..133bc2b3e7 100644
 --- a/codex-rs/tui/src/chatwidget/status_surfaces.rs
 +++ b/codex-rs/tui/src/chatwidget/status_surfaces.rs
 @@ -258,7 +258,13 @@ impl ChatWidget {
@@ -355,7 +355,7 @@ index 61b15b2f38..5d218e2e1c 100644
              StatusLineItem::TotalInputTokens => (!self.token_usage_pending).then(|| {
                  format!(
                      "{} in",
-@@ -868,6 +906,7 @@ impl ChatWidget {
+@@ -875,6 +913,7 @@ impl ChatWidget {
              StatusSurfacePreviewItem::CodexVersion => StatusLineItem::CodexVersion,
              StatusSurfacePreviewItem::ContextWindowSize => StatusLineItem::ContextWindowSize,
              StatusSurfacePreviewItem::ContextWindowUsage => StatusLineItem::ContextWindowUsage,

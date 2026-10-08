@@ -1,5 +1,5 @@
 diff --git a/codex-rs/tui/src/app/history_ui.rs b/codex-rs/tui/src/app/history_ui.rs
-index 52e7e0203e..8548115fa5 100644
+index dcacf8da01..652ca6ec43 100644
 --- a/codex-rs/tui/src/app/history_ui.rs
 +++ b/codex-rs/tui/src/app/history_ui.rs
 @@ -21,7 +21,32 @@ pub(super) struct ThreadUsageStatusHistory {
@@ -81,10 +81,10 @@ index 632ac8b4de..858539235f 100644
              cell_displays.push_front(ReflowCellDisplay {
                  lines,
 diff --git a/codex-rs/tui/src/chatwidget.rs b/codex-rs/tui/src/chatwidget.rs
-index eb9c9cdfa2..74c163efc8 100644
+index 7dbb54bb85..e3563ac897 100644
 --- a/codex-rs/tui/src/chatwidget.rs
 +++ b/codex-rs/tui/src/chatwidget.rs
-@@ -521,6 +521,7 @@ pub(crate) struct ChatWidget {
+@@ -523,6 +523,7 @@ pub(crate) struct ChatWidget {
      config: Config,
      pub(crate) local_settings: crate::local_settings::LocalSettings,
      raw_output_mode: bool,
@@ -93,10 +93,10 @@ index eb9c9cdfa2..74c163efc8 100644
      effective_service_tier: Option<String>,
      /// The unmasked collaboration mode settings (always Default mode).
 diff --git a/codex-rs/tui/src/chatwidget/constructor.rs b/codex-rs/tui/src/chatwidget/constructor.rs
-index fb4575ab0d..d03a3fe635 100644
+index dc5adf7b73..068bb07314 100644
 --- a/codex-rs/tui/src/chatwidget/constructor.rs
 +++ b/codex-rs/tui/src/chatwidget/constructor.rs
-@@ -115,6 +115,7 @@ impl ChatWidget {
+@@ -114,6 +114,7 @@ impl ChatWidget {
              }),
              transcript: TranscriptState::new(active_cell),
              raw_output_mode: local_settings.tui.raw_output_mode,
@@ -105,10 +105,10 @@ index fb4575ab0d..d03a3fe635 100644
              local_settings,
              effective_service_tier,
 diff --git a/codex-rs/tui/src/chatwidget/slash_dispatch.rs b/codex-rs/tui/src/chatwidget/slash_dispatch.rs
-index 4fe2ed057b..238feb0365 100644
+index 182a696b24..0612d38d2c 100644
 --- a/codex-rs/tui/src/chatwidget/slash_dispatch.rs
 +++ b/codex-rs/tui/src/chatwidget/slash_dispatch.rs
-@@ -464,6 +464,13 @@ impl ChatWidget {
+@@ -502,6 +502,13 @@ impl ChatWidget {
                  let enabled = self.toggle_raw_output_mode_and_notify();
                  self.emit_raw_output_mode_changed(enabled);
              }
@@ -122,19 +122,19 @@ index 4fe2ed057b..238feb0365 100644
              SlashCommand::Tui => self.show_tui_mode_picker(),
              SlashCommand::Diff => {
                  self.add_diff_in_progress();
-@@ -1224,6 +1231,7 @@ impl ChatWidget {
+@@ -1280,6 +1287,7 @@ impl ChatWidget {
              | SlashCommand::Rollout
              | SlashCommand::Copy
              | SlashCommand::Raw
 +            | SlashCommand::Focus
              | SlashCommand::Vim
+             | SlashCommand::Daybreak
              | SlashCommand::Diff
-             | SlashCommand::App
 diff --git a/codex-rs/tui/src/slash_command.rs b/codex-rs/tui/src/slash_command.rs
-index 301de2e054..99a20e9b71 100644
+index d9ba053eb5..e9cd1bfcca 100644
 --- a/codex-rs/tui/src/slash_command.rs
 +++ b/codex-rs/tui/src/slash_command.rs
-@@ -47,6 +47,7 @@ pub enum SlashCommand {
+@@ -48,6 +48,7 @@ pub enum SlashCommand {
      Copy,
      Export,
      Raw,
@@ -142,7 +142,7 @@ index 301de2e054..99a20e9b71 100644
      Tui,
      Diff,
      Mention,
-@@ -107,6 +108,7 @@ impl SlashCommand {
+@@ -108,6 +109,7 @@ impl SlashCommand {
              SlashCommand::Copy => "copy the last response or part of it",
              SlashCommand::Export => "export the conversation as markdown",
              SlashCommand::Raw => "toggle raw scrollback mode for copy-friendly terminal selection",
@@ -150,7 +150,7 @@ index 301de2e054..99a20e9b71 100644
              SlashCommand::Tui => "choose the TUI mode for the next launch",
              SlashCommand::Diff => "show git diff (including untracked files)",
              SlashCommand::Mention => "mention a file",
-@@ -267,6 +269,7 @@ impl SlashCommand {
+@@ -270,6 +272,7 @@ impl SlashCommand {
              | SlashCommand::Permissions
              | SlashCommand::Copy
              | SlashCommand::Raw
