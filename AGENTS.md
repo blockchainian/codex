@@ -79,6 +79,7 @@ Keep this repository's own checks minimal.
 
 - **patches**: `./scripts/check-patches.sh`
 - **Codex**: the relevant upstream tests
+- **TUI tests**: judge a patch by diffing failure lists against the baseline in a scratch worktree
 
 ## Version control
 
