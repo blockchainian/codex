@@ -1,29 +1,5 @@
-diff --git a/codex-rs/tui/src/app/event_dispatch.rs b/codex-rs/tui/src/app/event_dispatch.rs
-index 659e67a6ea..eb07098425 100644
---- a/codex-rs/tui/src/app/event_dispatch.rs
-+++ b/codex-rs/tui/src/app/event_dispatch.rs
-@@ -893,15 +893,18 @@ impl App {
-             }
-             AppEvent::ConsolidateAgentMessage {
-                 source,
-+                is_commentary,
-                 copy_source,
-                 cwd,
-                 inline_visualization_context,
-                 scrollback_reflow,
-                 deferred_history_cell,
-             } => {
-+                let mut cell = history_cell::AgentMarkdownCell::new_with_inline_visualizations(source, &cwd, inline_visualization_context).with_copy_source(copy_source);
-+                cell.is_commentary = is_commentary;
-                 self.handle_consolidate_agent_message(
-                     tui,
--                    history_cell::AgentMarkdownCell::new_with_inline_visualizations(source, &cwd, inline_visualization_context).with_copy_source(copy_source),
-+                    cell,
-                     scrollback_reflow,
-                     deferred_history_cell,
-                 )?;
 diff --git a/codex-rs/tui/src/app/history_ui.rs b/codex-rs/tui/src/app/history_ui.rs
-index ca29929c13..c6b43c327f 100644
+index ca29929c13..438b1f4aa7 100644
 --- a/codex-rs/tui/src/app/history_ui.rs
 +++ b/codex-rs/tui/src/app/history_ui.rs
 @@ -21,7 +21,32 @@ pub(super) struct ThreadUsageStatusHistory {
@@ -68,66 +44,45 @@ index ca29929c13..c6b43c327f 100644
          } else {
              Vec::new()
          };
-@@ -348,6 +373,7 @@ impl App {
-                 self.history_line_wrap_policy(),
-             );
-             self.has_emitted_history_lines = true;
-+            self.chat_widget.last_history_was_commentary = false;
-         }
-     }
- 
-@@ -377,6 +403,7 @@ impl App {
-             tui.terminal.set_viewport_area(area);
-         }
-         self.has_emitted_history_lines = false;
-+        self.chat_widget.last_history_was_commentary = false;
- 
-         if redraw_header {
-             self.queue_clear_ui_header(tui);
-@@ -404,6 +431,7 @@ impl App {
-         self.pending_thread_usage_history_refresh = false;
-         self.deferred_history_lines.clear();
-         self.has_emitted_history_lines = false;
-+        self.chat_widget.last_history_was_commentary = false;
-         self.transcript_reflow.clear();
-         self.chat_widget.clear_pending_rate_limit_reset_hint();
-         self.initial_history_replay_buffer = None;
 diff --git a/codex-rs/tui/src/app/resize_reflow.rs b/codex-rs/tui/src/app/resize_reflow.rs
-index 632ac8b4de..03343a5ebf 100644
+index 632ac8b4de..fc04d682c3 100644
 --- a/codex-rs/tui/src/app/resize_reflow.rs
 +++ b/codex-rs/tui/src/app/resize_reflow.rs
 @@ -48,6 +48,7 @@ impl From<ratatui::layout::Size> for TerminalWidth {
  struct ReflowCellDisplay {
      lines: Vec<HyperlinkLine>,
      is_stream_continuation: bool,
-+    is_commentary: bool,
++    needs_separator: bool,
  }
  
  /// Rendered transcript lines ready to be replayed into terminal scrollback.
-@@ -83,6 +84,7 @@ pub(super) fn trailing_run_start<T: 'static>(transcript_cells: &[Arc<dyn History
+@@ -81,6 +82,12 @@ pub(super) fn trailing_run_start<T: 'static>(transcript_cells: &[Arc<dyn History
+ }
+ 
  impl App {
++    fn history_cell_needs_separator(&self, cell: &dyn HistoryCell) -> bool {
++        !self.chat_widget.focus_mode
++            || !(cell.as_any().is::<history_cell::AgentMessageCell>()
++                || cell.as_any().is::<history_cell::AgentMarkdownCell>())
++    }
++
      pub(super) fn reset_history_emission_state(&mut self) {
          self.has_emitted_history_lines = false;
-+        self.chat_widget.last_history_was_commentary = false;
          self.deferred_history_lines.clear();
-         self.last_rendered_history_tail = None;
-     }
-@@ -92,10 +94,11 @@ impl App {
+@@ -92,10 +99,9 @@ impl App {
          cell: &dyn HistoryCell,
          width: u16,
      ) -> Vec<HyperlinkLine> {
 -        let mut display =
 -            cell.display_hyperlink_lines_for_mode(width, self.chat_widget.history_render_mode());
 +        let mut display = self.scrollback_lines(cell, width);
-+        let separate =
-+            !display.is_empty() && self.chat_widget.separate_history_cell(cell.is_commentary());
          if !display.is_empty() && !cell.is_stream_continuation() {
 -            if self.has_emitted_history_lines {
-+            if self.has_emitted_history_lines && separate {
++            if self.has_emitted_history_lines && self.history_cell_needs_separator(cell) {
                  display.insert(/*index*/ 0, HyperlinkLine::new(Line::from("")));
              } else {
                  self.has_emitted_history_lines = true;
-@@ -550,10 +553,7 @@ impl App {
+@@ -550,10 +556,7 @@ impl App {
              .iter()
              .rev()
              .find_map(|cell| {
@@ -139,7 +94,7 @@ index 632ac8b4de..03343a5ebf 100644
                  (!lines.is_empty()).then(|| super::history_ui::RenderedHistoryTail {
                      cell: Arc::downgrade(cell),
                      lines,
-@@ -663,12 +663,12 @@ impl App {
+@@ -663,12 +666,12 @@ impl App {
          while start > 0 {
              start -= 1;
              let cell = self.transcript_cells[start].clone();
@@ -150,136 +105,62 @@ index 632ac8b4de..03343a5ebf 100644
              cell_displays.push_front(ReflowCellDisplay {
                  lines,
                  is_stream_continuation: cell.is_stream_continuation(),
-+                is_commentary: cell.is_commentary(),
++                needs_separator: self.history_cell_needs_separator(cell.as_ref()),
              });
  
              if row_cap.is_some_and(|max_rows| rendered_rows > max_rows) {
-@@ -690,14 +690,20 @@ impl App {
+@@ -690,6 +693,7 @@ impl App {
                      self.chat_widget.history_render_mode(),
                  ),
                  is_stream_continuation: cell.is_stream_continuation(),
-+                is_commentary: cell.is_commentary(),
++                needs_separator: self.history_cell_needs_separator(cell.as_ref()),
              });
          }
  
-+        self.chat_widget.last_history_was_commentary = false;
-         let mut has_emitted_history_lines = false;
+@@ -697,7 +701,7 @@ impl App {
          let mut reflowed_lines = Vec::new();
          for display in cell_displays {
-+            let separate = !display.lines.is_empty()
-+                && self
-+                    .chat_widget
-+                    .separate_history_cell(display.is_commentary);
              if !display.lines.is_empty() && !display.is_stream_continuation {
 -                if has_emitted_history_lines {
-+                if has_emitted_history_lines && separate {
++                if has_emitted_history_lines && display.needs_separator {
                      reflowed_lines.push(HyperlinkLine::new(Line::from("")));
                  } else {
                      has_emitted_history_lines = true;
-diff --git a/codex-rs/tui/src/app/tests/user_verification_routes_tests.rs b/codex-rs/tui/src/app/tests/user_verification_routes_tests.rs
-index c288b03a3e..aa81c65879 100644
---- a/codex-rs/tui/src/app/tests/user_verification_routes_tests.rs
-+++ b/codex-rs/tui/src/app/tests/user_verification_routes_tests.rs
-@@ -273,6 +273,7 @@ async fn inactive_thread_user_verification_preserves_foreground_stream() -> Resu
-                 inline_visualization_context,
-                 scrollback_reflow,
-                 deferred_history_cell,
-+                ..
-             } => {
-                 completed_messages.push(source.clone());
-                 app.handle_consolidate_agent_message(
-diff --git a/codex-rs/tui/src/app_event.rs b/codex-rs/tui/src/app_event.rs
-index 7a388a223f..c77a633911 100644
---- a/codex-rs/tui/src/app_event.rs
-+++ b/codex-rs/tui/src/app_event.rs
-@@ -1192,6 +1192,7 @@ pub(crate) enum AppEvent {
-     /// transcript without first writing its provisional render to scrollback.
-     ConsolidateAgentMessage {
-         source: String,
-+        is_commentary: bool,
-         copy_source: Option<String>,
-         cwd: PathBuf,
-         inline_visualization_context: Option<InlineVisualizationContext>,
 diff --git a/codex-rs/tui/src/chatwidget.rs b/codex-rs/tui/src/chatwidget.rs
-index ea0a5ffd54..f771579fc4 100644
+index ea0a5ffd54..c01e7f170d 100644
 --- a/codex-rs/tui/src/chatwidget.rs
 +++ b/codex-rs/tui/src/chatwidget.rs
-@@ -523,6 +523,8 @@ pub(crate) struct ChatWidget {
+@@ -523,6 +523,7 @@ pub(crate) struct ChatWidget {
      config: Config,
      pub(crate) local_settings: crate::local_settings::LocalSettings,
      raw_output_mode: bool,
 +    pub(crate) focus_mode: bool,
-+    pub(crate) last_history_was_commentary: bool,
      /// Runtime value resolved by core. `config.service_tier` remains the explicit user choice.
      effective_service_tier: Option<String>,
      /// The unmasked collaboration mode settings (always Default mode).
-@@ -1224,7 +1226,8 @@ impl ChatWidget {
-         self.add_boxed_history(Box::new(cell));
-     }
- 
--    fn add_boxed_history(&mut self, cell: Box<dyn HistoryCell>) {
-+    fn add_boxed_history(&mut self, mut cell: Box<dyn HistoryCell>) {
-+        cell.set_commentary(self.transcript.is_commentary);
-         let Err(cell) = self.absorb_activity_detail(cell) else {
-             return;
-         };
 diff --git a/codex-rs/tui/src/chatwidget/constructor.rs b/codex-rs/tui/src/chatwidget/constructor.rs
-index 9af84e80a7..eed679311b 100644
+index 9af84e80a7..2339d9620f 100644
 --- a/codex-rs/tui/src/chatwidget/constructor.rs
 +++ b/codex-rs/tui/src/chatwidget/constructor.rs
-@@ -114,6 +114,8 @@ impl ChatWidget {
+@@ -114,6 +114,7 @@ impl ChatWidget {
              }),
              transcript: TranscriptState::new(active_cell),
              raw_output_mode: local_settings.tui.raw_output_mode,
 +            focus_mode: true,
-+            last_history_was_commentary: false,
              config,
              local_settings,
              effective_service_tier,
-diff --git a/codex-rs/tui/src/chatwidget/protocol.rs b/codex-rs/tui/src/chatwidget/protocol.rs
-index 411b5d0dd3..f9db18006d 100644
---- a/codex-rs/tui/src/chatwidget/protocol.rs
-+++ b/codex-rs/tui/src/chatwidget/protocol.rs
-@@ -567,8 +567,11 @@ impl ChatWidget {
-             {
-                 self.remember_realtime_delegated_reasoning_turn(&notification.turn_id);
-             }
--            ThreadItem::AgentMessage { id, .. } if replay_kind.is_none() => {
--                self.is_realtime_delegated_agent_item(&notification.turn_id, &id);
-+            ThreadItem::AgentMessage { id, phase, .. } => {
-+                self.transcript.is_commentary = matches!(phase, Some(MessagePhase::Commentary));
-+                if replay_kind.is_none() {
-+                    self.is_realtime_delegated_agent_item(&notification.turn_id, &id);
-+                }
-             }
-             ThreadItem::Reasoning { id, .. } => {
-                 if replay_kind.is_none()
 diff --git a/codex-rs/tui/src/chatwidget/rendering.rs b/codex-rs/tui/src/chatwidget/rendering.rs
-index bb1c28c930..1737672b14 100644
+index bb1c28c930..f3a79c8532 100644
 --- a/codex-rs/tui/src/chatwidget/rendering.rs
 +++ b/codex-rs/tui/src/chatwidget/rendering.rs
-@@ -126,6 +126,12 @@ impl ExternalWriterNotice {
- }
- 
- impl ChatWidget {
-+    pub(crate) fn separate_history_cell(&mut self, is_commentary: bool) -> bool {
-+        let separate = !self.focus_mode || !self.last_history_was_commentary || !is_commentary;
-+        self.last_history_was_commentary = is_commentary;
-+        separate
-+    }
-+
-     pub(crate) fn as_renderable(&self) -> RenderableItem<'_> {
-         let backdrop = self.as_backdrop_renderable();
-         match self.centered_dialog() {
-@@ -161,7 +167,12 @@ impl ChatWidget {
+@@ -161,7 +161,10 @@ impl ChatWidget {
              Some(cell) => RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                  child: cell.as_ref(),
                  // The initial header becomes the first history cell, which has no leading separator.
 -                top: if cell.as_any().is::<history_cell::SessionHeaderHistoryCell>() {
 +                top: if cell.as_any().is::<history_cell::SessionHeaderHistoryCell>()
 +                    || (self.focus_mode
-+                        && self.last_history_was_commentary
-+                        && self.transcript.is_commentary
 +                        && cell.as_any().is::<history_cell::StreamingAgentTailCell>())
 +                {
                      0
@@ -311,148 +192,6 @@ index 182a696b24..0612d38d2c 100644
              | SlashCommand::Vim
              | SlashCommand::Daybreak
              | SlashCommand::Diff
-diff --git a/codex-rs/tui/src/chatwidget/streaming.rs b/codex-rs/tui/src/chatwidget/streaming.rs
-index 1957cc4b37..5847198eda 100644
---- a/codex-rs/tui/src/chatwidget/streaming.rs
-+++ b/codex-rs/tui/src/chatwidget/streaming.rs
-@@ -88,7 +88,10 @@ impl ChatWidget {
-         if let Some(mut controller) = self.stream_controller.take() {
-             let needs_scrollback_reflow = controller.needs_scrollback_reflow();
-             self.clear_active_stream_tail();
--            let (cell, streamed_source) = controller.finalize();
-+            let (mut cell, streamed_source) = controller.finalize();
-+            if let Some(cell) = &mut cell {
-+                cell.set_commentary(self.transcript.is_commentary);
-+            }
-             let completed_display = completed_message.map(|source| {
-                 parse_assistant_markdown(source, self.config.cwd.as_path()).visible_markdown
-             });
-@@ -134,6 +137,7 @@ impl ChatWidget {
-                 self.note_stream_consolidation_queued();
-                 self.app_event_tx.send(AppEvent::ConsolidateAgentMessage {
-                     source,
-+                    is_commentary: self.transcript.is_commentary,
-                     copy_source,
-                     cwd: self.config.cwd.to_path_buf(),
-                     inline_visualization_context,
-@@ -421,6 +425,7 @@ impl ChatWidget {
-         if !from_replay && let Some(questions) = &item.questions {
-             self.add_async_questions(&item.id, questions);
-         }
-+        self.transcript.is_commentary = matches!(item.phase, Some(MessagePhase::Commentary));
-         self.transcript.last_completed_agent_message = Some((turn_id.to_string(), item.id.clone()));
-         let mut message = String::new();
-         for content in &item.content {
-diff --git a/codex-rs/tui/src/chatwidget/transcript.rs b/codex-rs/tui/src/chatwidget/transcript.rs
-index f055cd1b7b..88ab3e6236 100644
---- a/codex-rs/tui/src/chatwidget/transcript.rs
-+++ b/codex-rs/tui/src/chatwidget/transcript.rs
-@@ -33,6 +33,7 @@ pub(super) struct StatusCopySource {
- 
- #[derive(Default)]
- pub(super) struct TranscriptState {
-+    pub(super) is_commentary: bool,
-     pub(super) active_cell: Option<Box<dyn HistoryCell>>,
-     /// Shared retained rows for concurrently running dynamic tools, removed on completion.
-     pub(super) dynamic_calls:
-@@ -105,6 +106,7 @@ impl TranscriptState {
-     }
- 
-     pub(super) fn reset_turn_flags(&mut self) {
-+        self.is_commentary = false;
-         self.saw_copy_source_this_turn = false;
-         self.last_completed_agent_message = None;
-         self.saw_plan_update_this_turn = false;
-diff --git a/codex-rs/tui/src/history_cell/messages.rs b/codex-rs/tui/src/history_cell/messages.rs
-index 1cd4a356c5..c0d605d279 100644
---- a/codex-rs/tui/src/history_cell/messages.rs
-+++ b/codex-rs/tui/src/history_cell/messages.rs
-@@ -424,6 +424,7 @@ impl HistoryCell for ReasoningSummaryCell {
- 
- #[derive(Debug)]
- pub(crate) struct AgentMessageCell {
-+    pub(crate) is_commentary: bool,
-     lines: Vec<HyperlinkLine>,
-     is_first_line: bool,
- }
-@@ -434,6 +435,7 @@ impl AgentMessageCell {
-         Self {
-             lines: plain_hyperlink_lines(lines),
-             is_first_line,
-+            is_commentary: false,
-         }
-     }
- 
-@@ -441,11 +443,20 @@ impl AgentMessageCell {
-         Self {
-             lines,
-             is_first_line,
-+            is_commentary: false,
-         }
-     }
- }
- 
- impl HistoryCell for AgentMessageCell {
-+    fn is_commentary(&self) -> bool {
-+        self.is_commentary
-+    }
-+
-+    fn set_commentary(&mut self, is_commentary: bool) {
-+        self.is_commentary = is_commentary;
-+    }
-+
-     fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
-         visible_lines(self.display_hyperlink_lines(width))
-     }
-@@ -501,6 +512,7 @@ impl HistoryCell for AgentMessageCell {
- /// because resolving their local file links depends on filesystem state that can change later.
- #[derive(Debug)]
- pub(crate) struct AgentMarkdownCell {
-+    pub(crate) is_commentary: bool,
-     markdown_source: String,
-     copy_source: Option<String>,
-     cwd: PathBuf,
-@@ -546,6 +558,7 @@ impl AgentMarkdownCell {
-             inline_visualization_context,
-             rendered_lines,
-             spoken_artifacts: false,
-+            is_commentary: false,
-         }
-     }
- 
-@@ -628,6 +641,14 @@ impl AgentMarkdownCell {
- }
- 
- impl HistoryCell for AgentMarkdownCell {
-+    fn is_commentary(&self) -> bool {
-+        self.is_commentary
-+    }
-+
-+    fn set_commentary(&mut self, is_commentary: bool) {
-+        self.is_commentary = is_commentary;
-+    }
-+
-     fn copy_source(&self) -> Option<&str> {
-         Some(self.copy_source.as_deref().unwrap_or(&self.markdown_source))
-     }
-diff --git a/codex-rs/tui/src/history_cell/mod.rs b/codex-rs/tui/src/history_cell/mod.rs
-index ac39aef420..cfc5e53635 100644
---- a/codex-rs/tui/src/history_cell/mod.rs
-+++ b/codex-rs/tui/src/history_cell/mod.rs
-@@ -329,6 +329,13 @@ pub(crate) trait HistoryCell: std::fmt::Debug + Send + Sync + Any {
-         true
-     }
- 
-+    /// Whether this cell contains an assistant progress message.
-+    fn is_commentary(&self) -> bool {
-+        false
-+    }
-+
-+    fn set_commentary(&mut self, _is_commentary: bool) {}
-+
-     fn is_stream_continuation(&self) -> bool {
-         false
-     }
 diff --git a/codex-rs/tui/src/slash_command.rs b/codex-rs/tui/src/slash_command.rs
 index d9ba053eb5..e9cd1bfcca 100644
 --- a/codex-rs/tui/src/slash_command.rs
