@@ -1,8 +1,8 @@
 diff --git a/codex-rs/tui/src/bottom_pane/chat_composer.rs b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-index db261dcaee..1e7a281761 100644
+index 2591ebe4e5..15311f722a 100644
 --- a/codex-rs/tui/src/bottom_pane/chat_composer.rs
 +++ b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-@@ -4805,6 +4805,23 @@ impl ChatComposer {
+@@ -4817,6 +4817,23 @@ impl ChatComposer {
              let style = Style::default().dim();
              buf.set_string(composer_rect.x, composer_rect.y, &rule, style);
              buf.set_string(composer_rect.x, composer_rect.bottom() - 1, &rule, style);
@@ -27,7 +27,7 @@ index db261dcaee..1e7a281761 100644
          if !remote_images_rect.is_empty() {
              let first = self
 diff --git a/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs b/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
-index 5b8784a4fa..a39198315c 100644
+index bcc92a3ed5..4fe73c7635 100644
 --- a/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
 +++ b/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
 @@ -68,6 +68,7 @@ pub(crate) enum CommandPopupPlacement {
@@ -37,12 +37,12 @@ index 5b8784a4fa..a39198315c 100644
 +    pub(crate) thread_name: Option<&'a str>,
      /// Fullscreen limits the composer independently of activity and modal views.
      pub(crate) max_height: Option<u16>,
-     /// Reserve a shared hint row independently of whether it currently contains a notice.
+     pub(crate) rendered_selection:
 diff --git a/codex-rs/tui/src/bottom_pane/mod.rs b/codex-rs/tui/src/bottom_pane/mod.rs
-index c0e390289e..cab74a8cfb 100644
+index f81ddedd77..6d4856dc20 100644
 --- a/codex-rs/tui/src/bottom_pane/mod.rs
 +++ b/codex-rs/tui/src/bottom_pane/mod.rs
-@@ -2344,6 +2344,7 @@ impl BottomPane {
+@@ -2369,6 +2369,7 @@ impl BottomPane {
                  RenderableItem::Borrowed(questions.as_ref())
              } else if options.max_height.is_none()
                  && options.textarea_right_reserve == 0
@@ -51,13 +51,13 @@ index c0e390289e..cab74a8cfb 100644
                  && options.footer.is_none()
                  && !options.separate_status_line
 diff --git a/codex-rs/tui/src/chatwidget/rendering.rs b/codex-rs/tui/src/chatwidget/rendering.rs
-index adfe1cee5c..323c2d2197 100644
+index eee242df2e..bb1c28c930 100644
 --- a/codex-rs/tui/src/chatwidget/rendering.rs
 +++ b/codex-rs/tui/src/chatwidget/rendering.rs
-@@ -252,6 +252,7 @@ impl ChatWidget {
-             } else {
+@@ -253,6 +253,7 @@ impl ChatWidget {
                  self.ambient_pet_wrap_reserved_cols()
              };
+             options.rendered_selection = Some(&self.rendered_selection);
 +            options.thread_name = self.thread_name.as_deref();
              options.warning_count = self.warning_display_state.count;
              options.textarea_right_reserve = right_reserve;

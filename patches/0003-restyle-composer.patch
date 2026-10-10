@@ -1,8 +1,8 @@
 diff --git a/codex-rs/tui/src/bottom_pane/chat_composer.rs b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-index 7a36cd9959..db261dcaee 100644
+index 56beebc795..2591ebe4e5 100644
 --- a/codex-rs/tui/src/bottom_pane/chat_composer.rs
 +++ b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-@@ -362,7 +362,6 @@ use crate::render::Insets;
+@@ -363,7 +363,6 @@ use crate::render::Insets;
  use crate::render::RectExt;
  use crate::render::renderable::Renderable;
  use crate::slash_command::SlashCommand;
@@ -10,9 +10,9 @@ index 7a36cd9959..db261dcaee 100644
  use codex_protocol::ThreadId;
  use codex_protocol::user_input::ByteRange;
  use codex_protocol::user_input::MAX_USER_INPUT_TEXT_CHARS;
-@@ -4800,8 +4799,13 @@ impl ChatComposer {
-         if let Some((warning_area, line)) = warning_notice {
-             line.render(warning_area, buf);
+@@ -4812,8 +4811,13 @@ impl ChatComposer {
+             selection.register(status.intersection(buf.area), changed);
+             selection.register(footer_rect.intersection(buf.area), changed);
          }
 -        let style = user_message_style();
 -        Block::default().style(style).render(composer_rect, buf);
@@ -26,7 +26,7 @@ index 7a36cd9959..db261dcaee 100644
          if !remote_images_rect.is_empty() {
              let first = self
                  .attachments
-@@ -4815,7 +4819,6 @@ impl ChatComposer {
+@@ -4827,7 +4831,6 @@ impl ChatComposer {
                      .skip(first)
                      .collect::<Vec<_>>(),
              )
@@ -34,7 +34,7 @@ index 7a36cd9959..db261dcaee 100644
              .render(remote_images_rect, buf);
          }
          if !textarea_rect.is_empty() {
-@@ -4824,7 +4827,7 @@ impl ChatComposer {
+@@ -4836,7 +4839,7 @@ impl ChatComposer {
                      Span::from("!").light_red().bold()
                  } else if self.luna_reserve_active {
                      // Reserve keeps one arrow at every reasoning effort; only its foreground changes.
@@ -43,7 +43,7 @@ index 7a36cd9959..db261dcaee 100644
                          .fg(crate::terminal_palette::best_color((246, 197, 67)))
                          .bold()
                  } else if let Some(tier) = self.effort_tier {
-@@ -4835,10 +4838,10 @@ impl ChatComposer {
+@@ -4847,10 +4850,10 @@ impl ChatComposer {
                          .unwrap_or(1.0);
                      tier.prompt(charge)
                  } else {
