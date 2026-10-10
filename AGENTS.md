@@ -15,15 +15,17 @@ This repo is `blockchainian/codex`, personal patches and build tooling for OpenA
 
 Keep only personal patches, workflow scripts, and their documentation here. Never import upstream source or history.
 
-## Patches
+## Development
 
-Apply patches in filename order.
+Keep `official/` clean; develop only in the worktree created by `scripts/develop.sh`.
 
-Export a new patch relative to the committed patched development baseline, never relative to the unpatched official tree.
+Export a new patch relative to the committed patched development baseline, never relative to the unpatched official tree. Export before committing in the worktree, so `HEAD` still names that baseline.
 
 Keep patches focused. Do not put generated workspace version or lockfile changes into a feature patch. Intentional dependency changes must follow upstream dependency and lockfile rules.
 
-To change an existing patch, recreate the baseline before it and amend that patch. Never add a patch that undoes another.
+Apply patches in filename order. To change an existing patch, recreate the baseline before it and amend that patch. Never add a patch that undoes another.
+
+If other patches changed while you were developing, test the complete stack in a fresh worktree.
 
 ## Tools
 
@@ -41,18 +43,12 @@ To change an existing patch, recreate the baseline before it and amend that patc
 - `git -C official checkout --detach origin/main` — moves the submodule to them
 - `./scripts/check-patches.sh` — checks the patches against the new baseline; a conflict leaves `.worktrees/check-patches` for inspection
 - `git add official patches` — stages the pointer and the repaired patches for one commit
-- `./scripts/deploy.sh` — builds, installs, and starts the upgraded version
 
 ### Develop a patch
-
-> Keep `official/` clean; develop only in the worktree created by `scripts/develop.sh`.  
-> Export before committing in the worktree, so `HEAD` still names the patched baseline.  
-> If other patches changed while you were developing, test the complete stack in a fresh worktree.
 
 - `./scripts/develop.sh` — creates the development worktree in `.worktrees/develop`, with all patches committed as the baseline
 - `git add <feature-files>` — stages the feature in the worktree root, including new files and snapshot updates
 - `git diff --binary --cached HEAD > ../../patches/<NNNN>-<name>.patch` — exports the staged feature as a patch
-- `./scripts/check-patches.sh` — checks that all patches apply in order
 
 ### Deploy
 
