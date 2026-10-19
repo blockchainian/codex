@@ -127,31 +127,31 @@ index 632ac8b4de..fc04d682c3 100644
                  } else {
                      has_emitted_history_lines = true;
 diff --git a/codex-rs/tui/src/chatwidget.rs b/codex-rs/tui/src/chatwidget.rs
-index ea0a5ffd54..c01e7f170d 100644
+index 30e7cf8d7d..4fd4a48f39 100644
 --- a/codex-rs/tui/src/chatwidget.rs
 +++ b/codex-rs/tui/src/chatwidget.rs
-@@ -523,6 +523,7 @@ pub(crate) struct ChatWidget {
-     config: Config,
+@@ -531,6 +531,7 @@ pub(crate) struct ChatWidget {
      pub(crate) local_settings: crate::local_settings::LocalSettings,
+     pub(crate) config_panel_tui: codex_config::types::Tui,
      raw_output_mode: bool,
 +    pub(crate) focus_mode: bool,
      /// Runtime value resolved by core. `config.service_tier` remains the explicit user choice.
      effective_service_tier: Option<String>,
      /// The unmasked collaboration mode settings (always Default mode).
 diff --git a/codex-rs/tui/src/chatwidget/constructor.rs b/codex-rs/tui/src/chatwidget/constructor.rs
-index 9af84e80a7..2339d9620f 100644
+index 8ef50403dd..efb52a84b2 100644
 --- a/codex-rs/tui/src/chatwidget/constructor.rs
 +++ b/codex-rs/tui/src/chatwidget/constructor.rs
-@@ -114,6 +114,7 @@ impl ChatWidget {
+@@ -115,6 +115,7 @@ impl ChatWidget {
              }),
              transcript: TranscriptState::new(active_cell),
              raw_output_mode: local_settings.tui.raw_output_mode,
 +            focus_mode: true,
              config,
              local_settings,
-             effective_service_tier,
+             config_panel_tui,
 diff --git a/codex-rs/tui/src/chatwidget/rendering.rs b/codex-rs/tui/src/chatwidget/rendering.rs
-index bb1c28c930..f3a79c8532 100644
+index 78f41f5d8a..e065b0bfdc 100644
 --- a/codex-rs/tui/src/chatwidget/rendering.rs
 +++ b/codex-rs/tui/src/chatwidget/rendering.rs
 @@ -161,7 +161,10 @@ impl ChatWidget {
@@ -167,10 +167,10 @@ index bb1c28c930..f3a79c8532 100644
                  } else {
                      1
 diff --git a/codex-rs/tui/src/chatwidget/slash_dispatch.rs b/codex-rs/tui/src/chatwidget/slash_dispatch.rs
-index 182a696b24..0612d38d2c 100644
+index fd56394f6b..a9baa79c1a 100644
 --- a/codex-rs/tui/src/chatwidget/slash_dispatch.rs
 +++ b/codex-rs/tui/src/chatwidget/slash_dispatch.rs
-@@ -502,6 +502,13 @@ impl ChatWidget {
+@@ -505,6 +505,13 @@ impl ChatWidget {
                  let enabled = self.toggle_raw_output_mode_and_notify();
                  self.emit_raw_output_mode_changed(enabled);
              }
@@ -184,7 +184,7 @@ index 182a696b24..0612d38d2c 100644
              SlashCommand::Tui => self.show_tui_mode_picker(),
              SlashCommand::Diff => {
                  self.add_diff_in_progress();
-@@ -1280,6 +1287,7 @@ impl ChatWidget {
+@@ -1311,6 +1318,7 @@ impl ChatWidget {
              | SlashCommand::Rollout
              | SlashCommand::Copy
              | SlashCommand::Raw
@@ -193,10 +193,10 @@ index 182a696b24..0612d38d2c 100644
              | SlashCommand::Daybreak
              | SlashCommand::Diff
 diff --git a/codex-rs/tui/src/slash_command.rs b/codex-rs/tui/src/slash_command.rs
-index d9ba053eb5..e9cd1bfcca 100644
+index dfd05384f7..776640b489 100644
 --- a/codex-rs/tui/src/slash_command.rs
 +++ b/codex-rs/tui/src/slash_command.rs
-@@ -48,6 +48,7 @@ pub enum SlashCommand {
+@@ -50,6 +50,7 @@ pub enum SlashCommand {
      Copy,
      Export,
      Raw,
@@ -204,7 +204,7 @@ index d9ba053eb5..e9cd1bfcca 100644
      Tui,
      Diff,
      Mention,
-@@ -108,6 +109,7 @@ impl SlashCommand {
+@@ -111,6 +112,7 @@ impl SlashCommand {
              SlashCommand::Copy => "copy the last response or part of it",
              SlashCommand::Export => "export the conversation as markdown",
              SlashCommand::Raw => "toggle raw scrollback mode for copy-friendly terminal selection",
@@ -212,7 +212,7 @@ index d9ba053eb5..e9cd1bfcca 100644
              SlashCommand::Tui => "choose the TUI mode for the next launch",
              SlashCommand::Diff => "show git diff (including untracked files)",
              SlashCommand::Mention => "mention a file",
-@@ -270,6 +272,7 @@ impl SlashCommand {
+@@ -279,6 +281,7 @@ impl SlashCommand {
              | SlashCommand::Permissions
              | SlashCommand::Copy
              | SlashCommand::Raw

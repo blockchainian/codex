@@ -1,8 +1,8 @@
 diff --git a/codex-rs/config/src/tui_keymap.rs b/codex-rs/config/src/tui_keymap.rs
-index 0caf64d5ea..947b5876f5 100644
+index 170dcf1b44..a1e6e13801 100644
 --- a/codex-rs/config/src/tui_keymap.rs
 +++ b/codex-rs/config/src/tui_keymap.rs
-@@ -162,6 +162,8 @@ pub struct TuiGlobalKeymap {
+@@ -163,6 +163,8 @@ pub struct TuiGlobalKeymap {
      pub toggle_raw_output: Option<KeybindingsSpec>,
      /// Switch between a side conversation and its parent without closing either.
      pub toggle_side_conversation: Option<KeybindingsSpec>,
@@ -12,7 +12,7 @@ index 0caf64d5ea..947b5876f5 100644
  
  /// Chat context keybindings.
 diff --git a/codex-rs/tui/src/app/input.rs b/codex-rs/tui/src/app/input.rs
-index 2a8938dd3d..34f4174667 100644
+index 2ceb510c23..32705d65fc 100644
 --- a/codex-rs/tui/src/app/input.rs
 +++ b/codex-rs/tui/src/app/input.rs
 @@ -4,6 +4,7 @@
@@ -23,7 +23,7 @@ index 2a8938dd3d..34f4174667 100644
  use super::*;
  use crate::app_backtrack::SIDE_EDIT_PREVIOUS_UNAVAILABLE_MESSAGE;
  use crate::keymap::bindings_for_action;
-@@ -552,6 +553,13 @@ impl App {
+@@ -573,6 +574,13 @@ impl App {
              return;
          }
  
@@ -37,7 +37,7 @@ index 2a8938dd3d..34f4174667 100644
          let app_keymap_shortcuts_available = self.app_keymap_shortcuts_available();
          if app_keymap_shortcuts_available
              && self
-@@ -663,6 +671,15 @@ impl App {
+@@ -689,6 +697,15 @@ impl App {
          app_server: &mut AppServerSession,
          key_event: KeyEvent,
      ) -> bool {
@@ -51,13 +51,13 @@ index 2a8938dd3d..34f4174667 100644
 +            return true;
 +        }
          if self.keymap.app.open_warnings.is_pressed(key_event) {
+             self.verify_managed_daemon().await;
              self.chat_widget.open_warnings(&self.transcript_cells);
-             return true;
 diff --git a/codex-rs/tui/src/chatwidget/interaction.rs b/codex-rs/tui/src/chatwidget/interaction.rs
-index ddabe0e3e2..bf62878f57 100644
+index 8a0d75ad25..a4122ccbab 100644
 --- a/codex-rs/tui/src/chatwidget/interaction.rs
 +++ b/codex-rs/tui/src/chatwidget/interaction.rs
-@@ -335,6 +335,17 @@ impl ChatWidget {
+@@ -395,6 +395,17 @@ impl ChatWidget {
          self.bottom_pane.selected_index_for_present_view(view_id)
      }
  
@@ -76,10 +76,10 @@ index ddabe0e3e2..bf62878f57 100644
          self.bottom_pane.selected_index_for_active_view(view_id)
      }
 diff --git a/codex-rs/tui/src/keymap.rs b/codex-rs/tui/src/keymap.rs
-index 047473ad51..05e2c443a3 100644
+index c185f40f02..0194af2532 100644
 --- a/codex-rs/tui/src/keymap.rs
 +++ b/codex-rs/tui/src/keymap.rs
-@@ -118,6 +118,8 @@ pub(crate) struct AppKeymap {
+@@ -120,6 +120,8 @@ pub(crate) struct AppKeymap {
      pub(crate) toggle_raw_output: Vec<KeyBinding>,
      /// Switch between a side conversation and its parent without closing either.
      pub(crate) toggle_side_conversation: Vec<KeyBinding>,
@@ -88,7 +88,7 @@ index 047473ad51..05e2c443a3 100644
  }
  
  /// Chat-level keybindings evaluated at the app event layer.
-@@ -743,6 +745,16 @@ impl RuntimeKeymap {
+@@ -768,6 +770,16 @@ impl RuntimeKeymap {
                      "tui.keymap.global.toggle_side_conversation",
                  )?
              },
@@ -105,7 +105,7 @@ index 047473ad51..05e2c443a3 100644
          };
  
          // Voice yields to explicitly configured shortcuts and chord prefixes.
-@@ -1658,6 +1670,8 @@ impl RuntimeKeymap {
+@@ -1685,6 +1697,8 @@ impl RuntimeKeymap {
                  toggle_fast_mode: default_bindings![],
                  toggle_raw_output: default_bindings![alt(KeyCode::Char('r'))],
                  toggle_side_conversation: default_bindings![ctrl(KeyCode::Char('/'))],
@@ -114,16 +114,16 @@ index 047473ad51..05e2c443a3 100644
              },
              chords: Arc::default(),
              chat: ChatKeymap {
-@@ -1981,6 +1995,8 @@ impl RuntimeKeymap {
+@@ -2021,6 +2035,8 @@ impl RuntimeKeymap {
          #[cfg(unix)]
          for (action, bindings) in [
              ("global.open_agents", &self.app.open_agents),
 +            ("global.toggle_subagents", &self.app.toggle_subagents),
 +            ("global.open_main_agent", &self.app.open_main_agent),
+             ("chat.open_presets", &self.chat.open_presets),
              ("chat.toggle_voice", &self.chat.toggle_voice),
          ] {
-             if bindings.contains(&key_hint::ctrl(KeyCode::Char('z'))) {
-@@ -2008,6 +2024,8 @@ impl RuntimeKeymap {
+@@ -2049,6 +2065,8 @@ impl RuntimeKeymap {
          }
  
          let main_bindings = [
@@ -132,7 +132,7 @@ index 047473ad51..05e2c443a3 100644
              ("open_agents", self.app.open_agents.as_slice()),
              ("open_transcript", self.app.open_transcript.as_slice()),
              ("find_transcript", self.app.find_transcript.as_slice()),
-@@ -2173,6 +2191,8 @@ impl RuntimeKeymap {
+@@ -2215,6 +2233,8 @@ impl RuntimeKeymap {
          validate_no_shadow_with_allowed_overlaps(
              "main",
              [
@@ -142,10 +142,10 @@ index 047473ad51..05e2c443a3 100644
                  ("open_transcript", self.app.open_transcript.as_slice()),
                  ("find_transcript", self.app.find_transcript.as_slice()),
 diff --git a/codex-rs/tui/src/keymap/bindings.rs b/codex-rs/tui/src/keymap/bindings.rs
-index 3e044f2437..d1001fb2b4 100644
+index ac7447af53..30dc69209f 100644
 --- a/codex-rs/tui/src/keymap/bindings.rs
 +++ b/codex-rs/tui/src/keymap/bindings.rs
-@@ -281,6 +281,8 @@ define_runtime_action_bindings! {
+@@ -290,6 +290,8 @@ define_runtime_action_bindings! {
          toggle_fast_mode,
          toggle_raw_output,
          toggle_side_conversation,
@@ -153,4 +153,4 @@ index 3e044f2437..d1001fb2b4 100644
 +        open_main_agent,
      ],
      "chat" => Chat, chat, chat [
-         toggle_voice,
+         open_presets,

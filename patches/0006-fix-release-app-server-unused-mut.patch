@@ -1,8 +1,8 @@
 diff --git a/codex-rs/app-server/src/lib.rs b/codex-rs/app-server/src/lib.rs
-index ae748d401e..99ff487b9b 100644
+index 2469042c71..2213c0a574 100644
 --- a/codex-rs/app-server/src/lib.rs
 +++ b/codex-rs/app-server/src/lib.rs
-@@ -1491,7 +1491,7 @@ fn test_user_config_file_from_env() -> Option<std::path::PathBuf> {
+@@ -1525,7 +1525,7 @@ fn test_user_config_file_from_env() -> Option<std::path::PathBuf> {
  }
  
  fn loader_overrides_with_test_user_config_file(
