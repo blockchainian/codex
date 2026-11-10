@@ -1,21 +1,21 @@
 diff --git a/codex-rs/app-server/src/request_processors/thread_lifecycle.rs b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
-index ab13ac6b0d..64af3edb7e 100644
+index b9062d6e7a..bfc418f77a 100644
 --- a/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
 +++ b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs
-@@ -349,7 +349,7 @@ pub(super) async fn ensure_listener_task_running(
+@@ -559,7 +559,7 @@ async fn start_listener(
                      };
                      if matches!(
                          &event.msg,
--                        EventMsg::RawResponseItem(_) | EventMsg::RawResponseCompleted(_)
-+                        EventMsg::RawResponseItem(_)
+-                        EventMsg::RawResponseItem(_) | EventMsg::RawResponseCompleted(_) | EventMsg::PrivateSessionEvent(_)
++                        EventMsg::RawResponseItem(_) | EventMsg::PrivateSessionEvent(_)
                      ) && !raw_events_enabled
                      {
                          continue;
 diff --git a/codex-rs/codex-api/src/sse/responses.rs b/codex-rs/codex-api/src/sse/responses.rs
-index 34d55118c8..bf09b673db 100644
+index 333c2aa322..3fb257539c 100644
 --- a/codex-rs/codex-api/src/sse/responses.rs
 +++ b/codex-rs/codex-api/src/sse/responses.rs
-@@ -108,6 +108,8 @@ pub fn spawn_response_stream(
+@@ -110,6 +110,8 @@ pub fn spawn_response_stream(
  #[allow(dead_code)]
  struct ResponseCompleted {
      id: String,
@@ -24,7 +24,7 @@ index 34d55118c8..bf09b673db 100644
      #[serde(default)]
      usage: Option<ResponseCompletedUsage>,
      usage_metadata: Option<ResponseUsageMetadata>,
-@@ -460,6 +462,20 @@ pub fn process_responses_event(
+@@ -501,6 +503,20 @@ pub fn process_responses_event(
                          if let Some(metadata) = metadata {
                              resp.usage_metadata.get_or_insert_default().metadata = Some(metadata);
                          }
@@ -46,10 +46,10 @@ index 34d55118c8..bf09b673db 100644
                              response_id: resp.id,
                              token_usage: resp.usage.map(Into::into),
 diff --git a/codex-rs/rollout/src/policy.rs b/codex-rs/rollout/src/policy.rs
-index 51997cd91b..89e076748a 100644
+index e62c423204..6a978e93d4 100644
 --- a/codex-rs/rollout/src/policy.rs
 +++ b/codex-rs/rollout/src/policy.rs
-@@ -136,7 +136,8 @@ fn persisted_event_msg(
+@@ -137,7 +137,8 @@ fn persisted_event_msg(
          | EventMsg::TurnAborted(_)
          | EventMsg::TurnStarted(_)
          | EventMsg::TurnComplete(_)
@@ -59,19 +59,19 @@ index 51997cd91b..89e076748a 100644
  
          // Only persist these legacy events when the thread's history mode is Legacy.
          // New, paginated rollouts persist ItemCompleted events with TurnItems.
-@@ -184,7 +185,6 @@ fn persisted_event_msg(
-         | EventMsg::TurnModerationMetadata(_)
+@@ -186,7 +187,6 @@ fn persisted_event_msg(
          | EventMsg::AgentReasoningSectionBreak(_)
+         | EventMsg::PrivateSessionEvent(_)
          | EventMsg::RawResponseItem(_)
 -        | EventMsg::RawResponseCompleted(_)
          | EventMsg::SessionConfigured(_)
          | EventMsg::EnvironmentConnected(_)
          | EventMsg::EnvironmentDisconnected(_)
 diff --git a/codex-rs/tui/src/bottom_pane/status_line_setup.rs b/codex-rs/tui/src/bottom_pane/status_line_setup.rs
-index 98a473e159..00b769f0bb 100644
+index 57fc2d569f..ac49ce51d7 100644
 --- a/codex-rs/tui/src/bottom_pane/status_line_setup.rs
 +++ b/codex-rs/tui/src/bottom_pane/status_line_setup.rs
-@@ -122,6 +122,9 @@ pub(crate) enum StatusLineItem {
+@@ -123,6 +123,9 @@ pub(crate) enum StatusLineItem {
      /// Tokens in the current context window and its size.
      ContextWindowUsage,
  
@@ -81,7 +81,7 @@ index 98a473e159..00b769f0bb 100644
      /// Total tokens used in the current session.
      UsedTokens,
  
-@@ -200,6 +203,7 @@ impl StatusLineItem {
+@@ -212,6 +215,7 @@ impl StatusLineItem {
                  "Total context window size in tokens (omitted when unknown)"
              }
              StatusLineItem::ContextWindowUsage => "Current context tokens / window size",
@@ -89,7 +89,7 @@ index 98a473e159..00b769f0bb 100644
              StatusLineItem::UsedTokens => "Total tokens used in session (omitted when zero)",
              StatusLineItem::TotalInputTokens => "Total input tokens used in session",
              StatusLineItem::TotalOutputTokens => "Total output tokens used in session",
-@@ -247,6 +251,7 @@ impl StatusLineItem {
+@@ -261,6 +265,7 @@ impl StatusLineItem {
              StatusLineItem::CodexVersion => StatusSurfacePreviewItem::CodexVersion,
              StatusLineItem::ContextWindowSize => StatusSurfacePreviewItem::ContextWindowSize,
              StatusLineItem::ContextWindowUsage => StatusSurfacePreviewItem::ContextWindowUsage,
@@ -98,10 +98,10 @@ index 98a473e159..00b769f0bb 100644
              StatusLineItem::TotalInputTokens => StatusSurfacePreviewItem::TotalInputTokens,
              StatusLineItem::TotalOutputTokens => StatusSurfacePreviewItem::TotalOutputTokens,
 diff --git a/codex-rs/tui/src/bottom_pane/status_line_style.rs b/codex-rs/tui/src/bottom_pane/status_line_style.rs
-index aa216a83fb..a1de619fb6 100644
+index 7a2c01ec7f..6ac6196df3 100644
 --- a/codex-rs/tui/src/bottom_pane/status_line_style.rs
 +++ b/codex-rs/tui/src/bottom_pane/status_line_style.rs
-@@ -48,6 +48,7 @@ impl StatusLineAccent {
+@@ -59,6 +59,7 @@ impl StatusLineAccent {
              | StatusLineItem::ContextUsed
              | StatusLineItem::ContextWindowSize
              | StatusLineItem::ContextWindowUsage
@@ -109,24 +109,24 @@ index aa216a83fb..a1de619fb6 100644
              | StatusLineItem::UsedTokens
              | StatusLineItem::TotalInputTokens
              | StatusLineItem::TotalOutputTokens
-@@ -154,7 +155,14 @@ where
+@@ -174,7 +175,14 @@ where
+         if item == StatusLineItem::PullRequestNumber {
+             line.push_span(Span::styled(text, style.underlined()), pull_request_url);
          } else {
-             style
-         };
--        spans.push(Span::styled(text, style));
-+        if item == StatusLineItem::SessionTime
-+            && let Some((wall, api)) = text.split_once('/')
-+        {
-+            spans.push(Span::styled(wall.to_owned(), style.bold()));
-+            spans.push(Span::styled(format!("/{api}"), style));
-+        } else {
-+            spans.push(Span::styled(text, style));
-+        }
+-            line.line.push_span(Span::styled(text, style));
++            if item == StatusLineItem::SessionTime
++                && let Some((wall, api)) = text.split_once('/')
++            {
++                line.line.push_span(Span::styled(wall.to_owned(), style.bold()));
++                line.line.push_span(Span::styled(format!("/{api}"), style));
++            } else {
++                line.line.push_span(Span::styled(text, style));
++            }
+         }
      }
  
-     (!spans.is_empty()).then(|| Line::from(spans))
 diff --git a/codex-rs/tui/src/bottom_pane/status_surface_preview.rs b/codex-rs/tui/src/bottom_pane/status_surface_preview.rs
-index 492544442c..ca366e4503 100644
+index 302b409cb8..588c535abd 100644
 --- a/codex-rs/tui/src/bottom_pane/status_surface_preview.rs
 +++ b/codex-rs/tui/src/bottom_pane/status_surface_preview.rs
 @@ -28,6 +28,7 @@ pub(crate) enum StatusSurfacePreviewItem {
@@ -137,7 +137,7 @@ index 492544442c..ca366e4503 100644
      UsedTokens,
      TotalInputTokens,
      TotalOutputTokens,
-@@ -67,6 +68,7 @@ impl StatusSurfacePreviewItem {
+@@ -69,6 +70,7 @@ impl StatusSurfacePreviewItem {
              StatusSurfacePreviewItem::CodexVersion => "0.0.0",
              StatusSurfacePreviewItem::ContextWindowSize => "0 window",
              StatusSurfacePreviewItem::ContextWindowUsage => "0/0",
@@ -145,7 +145,7 @@ index 492544442c..ca366e4503 100644
              StatusSurfacePreviewItem::UsedTokens => "0 used",
              StatusSurfacePreviewItem::TotalInputTokens => "0 in",
              StatusSurfacePreviewItem::TotalOutputTokens => "0 out",
-@@ -106,6 +108,7 @@ impl StatusSurfacePreviewItem {
+@@ -110,6 +112,7 @@ impl StatusSurfacePreviewItem {
              Self::CodexVersion,
              Self::ContextWindowSize,
              Self::ContextWindowUsage,
@@ -154,7 +154,7 @@ index 492544442c..ca366e4503 100644
              Self::TotalInputTokens,
              Self::TotalOutputTokens,
 diff --git a/codex-rs/tui/src/chatwidget/protocol.rs b/codex-rs/tui/src/chatwidget/protocol.rs
-index 5bd2254d86..c667d9e128 100644
+index 3f1ea5a7c3..9c0e49f111 100644
 --- a/codex-rs/tui/src/chatwidget/protocol.rs
 +++ b/codex-rs/tui/src/chatwidget/protocol.rs
 @@ -58,6 +58,14 @@ impl ChatWidget {
@@ -172,7 +172,7 @@ index 5bd2254d86..c667d9e128 100644
              ServerNotification::ThreadTokenUsageUpdated(notification) => {
                  self.set_token_info(Some(token_usage_info_from_app_server(
                      notification.token_usage,
-@@ -374,7 +382,6 @@ impl ChatWidget {
+@@ -405,7 +413,6 @@ impl ChatWidget {
              | ServerNotification::ThreadUnarchived(_)
              | ServerNotification::ThreadAttachmentUpdated(_)
              | ServerNotification::RawResponseItemCompleted(_)
@@ -181,10 +181,10 @@ index 5bd2254d86..c667d9e128 100644
              | ServerNotification::ProcessOutputDelta(_)
              | ServerNotification::ProcessExited(_)
 diff --git a/codex-rs/tui/src/chatwidget/session_flow.rs b/codex-rs/tui/src/chatwidget/session_flow.rs
-index 15f6a354cd..368a2a7b6d 100644
+index 57376049a2..3777985f43 100644
 --- a/codex-rs/tui/src/chatwidget/session_flow.rs
 +++ b/codex-rs/tui/src/chatwidget/session_flow.rs
-@@ -70,6 +70,11 @@ impl ChatWidget {
+@@ -90,6 +90,11 @@ impl ChatWidget {
          self.set_skills(/*skills*/ None);
          self.session_network_proxy = session.network_proxy.clone();
          let previous_thread_id = self.thread_id;
@@ -197,7 +197,7 @@ index 15f6a354cd..368a2a7b6d 100644
              || self.config.cwd.as_path() != session.cwd.as_path();
          self.thread_id = Some(session.thread_id);
 diff --git a/codex-rs/tui/src/chatwidget/status_state.rs b/codex-rs/tui/src/chatwidget/status_state.rs
-index fa686f10ed..9bf556e46f 100644
+index f7b465df85..2bb7e7c7ce 100644
 --- a/codex-rs/tui/src/chatwidget/status_state.rs
 +++ b/codex-rs/tui/src/chatwidget/status_state.rs
 @@ -2,6 +2,11 @@
@@ -212,7 +212,7 @@ index fa686f10ed..9bf556e46f 100644
  
  #[derive(Clone, Debug, PartialEq, Eq)]
  pub(super) struct StatusIndicatorState {
-@@ -126,6 +131,9 @@ pub(super) struct StatusState {
+@@ -124,6 +129,9 @@ pub(super) struct StatusState {
      pub(super) program_status_after_turn: ProgramStatus,
      pub(super) retry_status_header: Option<String>,
      pub(super) pending_status_indicator_restore: bool,
@@ -222,7 +222,7 @@ index fa686f10ed..9bf556e46f 100644
  }
  
  impl Default for StatusState {
-@@ -141,11 +149,67 @@ impl Default for StatusState {
+@@ -138,11 +146,67 @@ impl Default for StatusState {
              program_status_after_turn: ProgramStatus::Idle,
              retry_status_header: None,
              pending_status_indicator_restore: false,
@@ -291,10 +291,10 @@ index fa686f10ed..9bf556e46f 100644
          self.current_status = status;
      }
 diff --git a/codex-rs/tui/src/chatwidget/status_surfaces.rs b/codex-rs/tui/src/chatwidget/status_surfaces.rs
-index 69fe5367bb..83184d1a88 100644
+index e589fe504b..320e1dd89a 100644
 --- a/codex-rs/tui/src/chatwidget/status_surfaces.rs
 +++ b/codex-rs/tui/src/chatwidget/status_surfaces.rs
-@@ -259,7 +259,13 @@ impl ChatWidget {
+@@ -255,7 +255,13 @@ impl ChatWidget {
          let now = Instant::now();
          self.terminal_title_next_refresh = self
              .terminal_title_animation_interval_with_selections(selections)
@@ -309,7 +309,7 @@ index 69fe5367bb..83184d1a88 100644
          if selections.terminal_title_items.is_empty() {
              if let Err(err) = self.clear_managed_terminal_title() {
                  tracing::debug!(error = %err, "failed to clear terminal title");
-@@ -315,6 +321,12 @@ impl ChatWidget {
+@@ -311,6 +317,12 @@ impl ChatWidget {
          let selections = self.status_surface_selections();
          self.warn_invalid_terminal_title_items_once(&selections.invalid_terminal_title_items);
          self.sync_status_surface_shared_state(&selections);
@@ -322,7 +322,7 @@ index 69fe5367bb..83184d1a88 100644
          self.refresh_terminal_title_from_selections(&selections);
      }
  
-@@ -799,6 +811,32 @@ impl ChatWidget {
+@@ -804,6 +816,32 @@ impl ChatWidget {
                  let window = format_tokens_compact(self.status_line_context_window_size()?);
                  Some(format!("{used}/{window}").to_ascii_lowercase())
              }
@@ -355,7 +355,7 @@ index 69fe5367bb..83184d1a88 100644
              StatusLineItem::TotalInputTokens => (!self.token_usage_pending).then(|| {
                  format!(
                      "{} in",
-@@ -891,6 +929,7 @@ impl ChatWidget {
+@@ -885,6 +923,7 @@ impl ChatWidget {
              StatusSurfacePreviewItem::CodexVersion => StatusLineItem::CodexVersion,
              StatusSurfacePreviewItem::ContextWindowSize => StatusLineItem::ContextWindowSize,
              StatusSurfacePreviewItem::ContextWindowUsage => StatusLineItem::ContextWindowUsage,

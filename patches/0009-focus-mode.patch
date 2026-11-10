@@ -1,5 +1,5 @@
 diff --git a/codex-rs/tui/src/app/history_ui.rs b/codex-rs/tui/src/app/history_ui.rs
-index ca29929c13..438b1f4aa7 100644
+index ac38f1110f..532d09d29a 100644
 --- a/codex-rs/tui/src/app/history_ui.rs
 +++ b/codex-rs/tui/src/app/history_ui.rs
 @@ -21,7 +21,32 @@ pub(super) struct ThreadUsageStatusHistory {
@@ -32,10 +32,10 @@ index ca29929c13..438b1f4aa7 100644
 +        cell.display_hyperlink_lines_for_mode(width, self.chat_widget.history_render_mode())
 +    }
 +
-     pub(super) fn insert_history_cell(&mut self, tui: &mut tui::Tui, cell: Box<dyn HistoryCell>) {
-         // Global deprecations can be delivered again by hidden threads. Scope deduplication to
-         // retained history so clearing or rebuilding a transcript can show the notice again.
-@@ -80,7 +105,7 @@ impl App {
+     pub(super) fn link_viewed_image(&self, cell: &mut dyn HistoryCell) {
+         if let Some(image) = cell
+             .as_any_mut()
+@@ -97,7 +122,7 @@ impl App {
          // Owned replay must not eagerly format every historical entry. Composite status cards are
          // the only committed cells whose mutable usage data needs insertion-time bookkeeping.
          let lines = if !deferred || cell.as_any().is::<history_cell::CompositeHistoryCell>() {
@@ -45,7 +45,7 @@ index ca29929c13..438b1f4aa7 100644
              Vec::new()
          };
 diff --git a/codex-rs/tui/src/app/resize_reflow.rs b/codex-rs/tui/src/app/resize_reflow.rs
-index 632ac8b4de..fc04d682c3 100644
+index d946ea41d0..9bf507fafc 100644
 --- a/codex-rs/tui/src/app/resize_reflow.rs
 +++ b/codex-rs/tui/src/app/resize_reflow.rs
 @@ -48,6 +48,7 @@ impl From<ratatui::layout::Size> for TerminalWidth {
@@ -82,7 +82,7 @@ index 632ac8b4de..fc04d682c3 100644
                  display.insert(/*index*/ 0, HyperlinkLine::new(Line::from("")));
              } else {
                  self.has_emitted_history_lines = true;
-@@ -550,10 +556,7 @@ impl App {
+@@ -547,10 +553,7 @@ impl App {
              .iter()
              .rev()
              .find_map(|cell| {
@@ -94,7 +94,7 @@ index 632ac8b4de..fc04d682c3 100644
                  (!lines.is_empty()).then(|| super::history_ui::RenderedHistoryTail {
                      cell: Arc::downgrade(cell),
                      lines,
-@@ -663,12 +666,12 @@ impl App {
+@@ -664,12 +667,12 @@ impl App {
          while start > 0 {
              start -= 1;
              let cell = self.transcript_cells[start].clone();
@@ -108,8 +108,8 @@ index 632ac8b4de..fc04d682c3 100644
 +                needs_separator: self.history_cell_needs_separator(cell.as_ref()),
              });
  
-             if row_cap.is_some_and(|max_rows| rendered_rows > max_rows) {
-@@ -690,6 +693,7 @@ impl App {
+             if cell.as_any().is::<history_cell::ClearScreenHeader>() {
+@@ -694,6 +697,7 @@ impl App {
                      self.chat_widget.history_render_mode(),
                  ),
                  is_stream_continuation: cell.is_stream_continuation(),
@@ -117,7 +117,7 @@ index 632ac8b4de..fc04d682c3 100644
              });
          }
  
-@@ -697,7 +701,7 @@ impl App {
+@@ -701,7 +705,7 @@ impl App {
          let mut reflowed_lines = Vec::new();
          for display in cell_displays {
              if !display.lines.is_empty() && !display.is_stream_continuation {
@@ -127,10 +127,10 @@ index 632ac8b4de..fc04d682c3 100644
                  } else {
                      has_emitted_history_lines = true;
 diff --git a/codex-rs/tui/src/chatwidget.rs b/codex-rs/tui/src/chatwidget.rs
-index 30e7cf8d7d..4fd4a48f39 100644
+index 0eb1bb5db6..e75a269473 100644
 --- a/codex-rs/tui/src/chatwidget.rs
 +++ b/codex-rs/tui/src/chatwidget.rs
-@@ -531,6 +531,7 @@ pub(crate) struct ChatWidget {
+@@ -537,6 +537,7 @@ pub(crate) struct ChatWidget {
      pub(crate) local_settings: crate::local_settings::LocalSettings,
      pub(crate) config_panel_tui: codex_config::types::Tui,
      raw_output_mode: bool,
@@ -139,10 +139,10 @@ index 30e7cf8d7d..4fd4a48f39 100644
      effective_service_tier: Option<String>,
      /// The unmasked collaboration mode settings (always Default mode).
 diff --git a/codex-rs/tui/src/chatwidget/constructor.rs b/codex-rs/tui/src/chatwidget/constructor.rs
-index 8ef50403dd..efb52a84b2 100644
+index 9d1d4fa6f5..9299623a7c 100644
 --- a/codex-rs/tui/src/chatwidget/constructor.rs
 +++ b/codex-rs/tui/src/chatwidget/constructor.rs
-@@ -115,6 +115,7 @@ impl ChatWidget {
+@@ -121,6 +121,7 @@ impl ChatWidget {
              }),
              transcript: TranscriptState::new(active_cell),
              raw_output_mode: local_settings.tui.raw_output_mode,
@@ -151,10 +151,10 @@ index 8ef50403dd..efb52a84b2 100644
              local_settings,
              config_panel_tui,
 diff --git a/codex-rs/tui/src/chatwidget/rendering.rs b/codex-rs/tui/src/chatwidget/rendering.rs
-index 78f41f5d8a..e065b0bfdc 100644
+index a9cabfdeff..3e6de488a0 100644
 --- a/codex-rs/tui/src/chatwidget/rendering.rs
 +++ b/codex-rs/tui/src/chatwidget/rendering.rs
-@@ -161,7 +161,10 @@ impl ChatWidget {
+@@ -172,7 +172,10 @@ impl ChatWidget {
              Some(cell) => RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                  child: cell.as_ref(),
                  // The initial header becomes the first history cell, which has no leading separator.
@@ -167,10 +167,10 @@ index 78f41f5d8a..e065b0bfdc 100644
                  } else {
                      1
 diff --git a/codex-rs/tui/src/chatwidget/slash_dispatch.rs b/codex-rs/tui/src/chatwidget/slash_dispatch.rs
-index fd56394f6b..a9baa79c1a 100644
+index ee1c21bd40..16798e3d24 100644
 --- a/codex-rs/tui/src/chatwidget/slash_dispatch.rs
 +++ b/codex-rs/tui/src/chatwidget/slash_dispatch.rs
-@@ -505,6 +505,13 @@ impl ChatWidget {
+@@ -507,6 +507,13 @@ impl ChatWidget {
                  let enabled = self.toggle_raw_output_mode_and_notify();
                  self.emit_raw_output_mode_changed(enabled);
              }
@@ -184,7 +184,7 @@ index fd56394f6b..a9baa79c1a 100644
              SlashCommand::Tui => self.show_tui_mode_picker(),
              SlashCommand::Diff => {
                  self.add_diff_in_progress();
-@@ -1311,6 +1318,7 @@ impl ChatWidget {
+@@ -1315,6 +1322,7 @@ impl ChatWidget {
              | SlashCommand::Rollout
              | SlashCommand::Copy
              | SlashCommand::Raw
@@ -193,7 +193,7 @@ index fd56394f6b..a9baa79c1a 100644
              | SlashCommand::Daybreak
              | SlashCommand::Diff
 diff --git a/codex-rs/tui/src/slash_command.rs b/codex-rs/tui/src/slash_command.rs
-index dfd05384f7..776640b489 100644
+index dd614df096..e79542cede 100644
 --- a/codex-rs/tui/src/slash_command.rs
 +++ b/codex-rs/tui/src/slash_command.rs
 @@ -50,6 +50,7 @@ pub enum SlashCommand {
@@ -212,7 +212,7 @@ index dfd05384f7..776640b489 100644
              SlashCommand::Tui => "choose the TUI mode for the next launch",
              SlashCommand::Diff => "show git diff (including untracked files)",
              SlashCommand::Mention => "mention a file",
-@@ -279,6 +281,7 @@ impl SlashCommand {
+@@ -278,6 +280,7 @@ impl SlashCommand {
              | SlashCommand::Permissions
              | SlashCommand::Copy
              | SlashCommand::Raw

@@ -1,8 +1,8 @@
 diff --git a/codex-rs/tui/src/bottom_pane/chat_composer.rs b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-index 194764bc18..4e463ca4cd 100644
+index f0c5cc519a..50cd64c74a 100644
 --- a/codex-rs/tui/src/bottom_pane/chat_composer.rs
 +++ b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-@@ -4868,6 +4868,23 @@ impl ChatComposer {
+@@ -4898,6 +4898,23 @@ impl ChatComposer {
              let style = Style::default().dim();
              buf.set_string(composer_rect.x, composer_rect.y, &rule, style);
              buf.set_string(composer_rect.x, composer_rect.bottom() - 1, &rule, style);
@@ -24,40 +24,40 @@ index 194764bc18..4e463ca4cd 100644
 +                );
 +            }
          }
-         if !remote_images_rect.is_empty() {
-             let first = self
+         if let Some(previews) = options.image_previews {
+             previews.render(
 diff --git a/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs b/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
-index bcc92a3ed5..4fe73c7635 100644
+index b70e740c3c..dc2262020b 100644
 --- a/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
 +++ b/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
-@@ -68,6 +68,7 @@ pub(crate) enum CommandPopupPlacement {
+@@ -70,6 +70,7 @@ pub(crate) enum CommandPopupPlacement {
  /// A borrowed presentation shared by measurement, painting, and cursor placement.
  #[derive(Clone, Copy, Default)]
  pub(crate) struct ComposerRenderOptions<'a> {
 +    pub(crate) thread_name: Option<&'a str>,
      /// Fullscreen limits the composer independently of activity and modal views.
      pub(crate) max_height: Option<u16>,
-     pub(crate) rendered_selection:
+     pub(crate) image_previews: Option<&'a crate::transcript_image::composer::ComposerImages>,
 diff --git a/codex-rs/tui/src/bottom_pane/mod.rs b/codex-rs/tui/src/bottom_pane/mod.rs
-index 90ed97e811..91a18a6f52 100644
+index c1d8257b64..5da082293c 100644
 --- a/codex-rs/tui/src/bottom_pane/mod.rs
 +++ b/codex-rs/tui/src/bottom_pane/mod.rs
-@@ -2536,6 +2536,7 @@ impl BottomPane {
-                 RenderableItem::Borrowed(questions.as_ref())
+@@ -2596,6 +2596,7 @@ impl BottomPane {
              } else if options.max_height.is_none()
+                 && options.image_previews.is_none()
                  && options.textarea_right_reserve == 0
 +                && options.thread_name.is_none()
                  && options.warning_count == 0
                  && options.footer.is_none()
                  && !options.separate_status_line
 diff --git a/codex-rs/tui/src/chatwidget/rendering.rs b/codex-rs/tui/src/chatwidget/rendering.rs
-index 15bbdad9d8..78f41f5d8a 100644
+index 1a78db7a24..a9cabfdeff 100644
 --- a/codex-rs/tui/src/chatwidget/rendering.rs
 +++ b/codex-rs/tui/src/chatwidget/rendering.rs
-@@ -253,6 +253,7 @@ impl ChatWidget {
-                 self.ambient_pet_wrap_reserved_cols()
+@@ -286,6 +286,7 @@ impl ChatWidget {
              };
              options.rendered_selection = Some(&self.rendered_selection);
+             options.image_previews = self.composer_images.as_ref();
 +            options.thread_name = self.thread_name.as_deref();
              options.warning_count = self.warning_display_state.count;
              options.textarea_right_reserve = right_reserve;
