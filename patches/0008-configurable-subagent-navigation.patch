@@ -22,7 +22,7 @@ index 03c9b5e190..e2c106f47f 100644
 +use super::agent_picker::AGENT_PICKER_VIEW_ID;
  use super::*;
  use crate::app_backtrack::SIDE_EDIT_PREVIOUS_UNAVAILABLE_MESSAGE;
- use crate::keymap::KeymapContextSet;
+ use crate::keymap::bindings_for_action;
 @@ -670,6 +671,13 @@ impl App {
              return;
          }
@@ -114,33 +114,25 @@ index 5dd67dabd6..6be8a029e8 100644
              },
              chords: Arc::default(),
              chat: ChatKeymap {
-@@ -2216,6 +2230,8 @@ impl RuntimeKeymap {
-             ("global.close_sidebar_tab", &self.app.close_sidebar_tab),
-             ("global.sidebar_up", &self.app.sidebar_up),
-             ("global.sidebar_down", &self.app.sidebar_down),
+@@ -2047,6 +2061,8 @@ impl RuntimeKeymap {
+         #[cfg(unix)]
+         for (action, bindings) in [
+             ("global.open_agents", &self.app.open_agents),
 +            ("global.toggle_subagents", &self.app.toggle_subagents),
 +            ("global.open_main_agent", &self.app.open_main_agent),
              ("chat.open_presets", &self.chat.open_presets),
              ("chat.toggle_voice", &self.chat.toggle_voice),
          ] {
-@@ -2269,6 +2285,8 @@ impl RuntimeKeymap {
-             ("close_sidebar_tab", self.app.close_sidebar_tab.as_slice()),
-             ("sidebar_up", self.app.sidebar_up.as_slice()),
-             ("sidebar_down", self.app.sidebar_down.as_slice()),
+@@ -2087,6 +2105,8 @@ impl RuntimeKeymap {
+             ("copy", self.app.copy.as_slice()),
+             ("clear_terminal", self.app.clear_terminal.as_slice()),
+             ("toggle_vim_mode", self.app.toggle_vim_mode.as_slice()),
 +            ("toggle_subagents", self.app.toggle_subagents.as_slice()),
 +            ("open_main_agent", self.app.open_main_agent.as_slice()),
-             ("open_agents", self.app.open_agents.as_slice()),
-             ("open_transcript", self.app.open_transcript.as_slice()),
-             ("find_transcript", self.app.find_transcript.as_slice()),
-@@ -2459,6 +2477,8 @@ impl RuntimeKeymap {
-                 ("close_sidebar_tab", self.app.close_sidebar_tab.as_slice()),
-                 ("sidebar_up", self.app.sidebar_up.as_slice()),
-                 ("sidebar_down", self.app.sidebar_down.as_slice()),
-+                ("toggle_subagents", self.app.toggle_subagents.as_slice()),
-+                ("open_main_agent", self.app.open_main_agent.as_slice()),
-                 ("open_agents", self.app.open_agents.as_slice()),
-                 ("open_transcript", self.app.open_transcript.as_slice()),
-                 ("find_transcript", self.app.find_transcript.as_slice()),
+             ("toggle_fast_mode", self.app.toggle_fast_mode.as_slice()),
+             ("toggle_raw_output", self.app.toggle_raw_output.as_slice()),
+             ("toggle_side_conversation", side_toggle_bindings.as_slice()),
+
 diff --git a/codex-rs/tui/src/keymap/bindings.rs b/codex-rs/tui/src/keymap/bindings.rs
 index 7bb98cd5d8..29ba8a921d 100644
 --- a/codex-rs/tui/src/keymap/bindings.rs
