@@ -1,8 +1,16 @@
 diff --git a/codex-rs/tui/src/bottom_pane/chat_composer.rs b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-index f0c5cc519a..50cd64c74a 100644
+index e6ad4d4be2..cd022ba5a0 100644
 --- a/codex-rs/tui/src/bottom_pane/chat_composer.rs
 +++ b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-@@ -4898,6 +4898,23 @@ impl ChatComposer {
+@@ -384,6 +384,7 @@ use crate::keymap::KeymapContextSet;
+ use crate::keymap::RuntimeKeymap;
+ use crate::keymap::VimNormalKeymap;
+ use crate::keymap::user_bindings;
++use crate::line_truncation::truncate_line_with_ellipsis_if_overflow;
+ use crate::render::Insets;
+ use crate::render::RectExt;
+ use crate::render::renderable::Renderable;
+@@ -4937,6 +4938,23 @@ impl ChatComposer {
              let style = Style::default().dim();
              buf.set_string(composer_rect.x, composer_rect.y, &rule, style);
              buf.set_string(composer_rect.x, composer_rect.bottom() - 1, &rule, style);
@@ -27,7 +35,7 @@ index f0c5cc519a..50cd64c74a 100644
          if let Some(previews) = options.image_previews {
              previews.render(
 diff --git a/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs b/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
-index b70e740c3c..dc2262020b 100644
+index 85ba7e945e..0927c09f24 100644
 --- a/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
 +++ b/codex-rs/tui/src/bottom_pane/chat_composer/footer_state.rs
 @@ -70,6 +70,7 @@ pub(crate) enum CommandPopupPlacement {
@@ -39,10 +47,10 @@ index b70e740c3c..dc2262020b 100644
      pub(crate) max_height: Option<u16>,
      pub(crate) image_previews: Option<&'a crate::transcript_image::composer::ComposerImages>,
 diff --git a/codex-rs/tui/src/bottom_pane/mod.rs b/codex-rs/tui/src/bottom_pane/mod.rs
-index c1d8257b64..5da082293c 100644
+index aef7c535b1..6c9622b8f6 100644
 --- a/codex-rs/tui/src/bottom_pane/mod.rs
 +++ b/codex-rs/tui/src/bottom_pane/mod.rs
-@@ -2596,6 +2596,7 @@ impl BottomPane {
+@@ -2564,6 +2564,7 @@ impl BottomPane {
              } else if options.max_height.is_none()
                  && options.image_previews.is_none()
                  && options.textarea_right_reserve == 0
@@ -51,10 +59,10 @@ index c1d8257b64..5da082293c 100644
                  && options.footer.is_none()
                  && !options.separate_status_line
 diff --git a/codex-rs/tui/src/chatwidget/rendering.rs b/codex-rs/tui/src/chatwidget/rendering.rs
-index 1a78db7a24..a9cabfdeff 100644
+index 8ab45414e5..c125770401 100644
 --- a/codex-rs/tui/src/chatwidget/rendering.rs
 +++ b/codex-rs/tui/src/chatwidget/rendering.rs
-@@ -286,6 +286,7 @@ impl ChatWidget {
+@@ -285,6 +285,7 @@ impl ChatWidget {
              };
              options.rendered_selection = Some(&self.rendered_selection);
              options.image_previews = self.composer_images.as_ref();
