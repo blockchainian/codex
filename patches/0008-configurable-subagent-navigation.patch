@@ -15,14 +15,9 @@ diff --git a/codex-rs/tui/src/app/input.rs b/codex-rs/tui/src/app/input.rs
 index 025a7c3916..fe074fb6eb 100644
 --- a/codex-rs/tui/src/app/input.rs
 +++ b/codex-rs/tui/src/app/input.rs
-@@ -4,6 +4,7 @@
- //! entry, Ctrl-L clear, external editor launch, agent navigation shortcuts, and legacy Vim
- //! Escape recovery for the active composer or command-center rename editor.
- 
+@@ -7 +7,2 @@
 +use super::agent_picker::AGENT_PICKER_VIEW_ID;
  use super::*;
- use crate::app_backtrack::SIDE_EDIT_PREVIOUS_UNAVAILABLE_MESSAGE;
- use crate::keymap::KeymapContextSet;
 @@ -636,6 +637,13 @@ impl App {
              return;
          }
