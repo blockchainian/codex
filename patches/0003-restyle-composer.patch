@@ -2,14 +2,6 @@ diff --git a/codex-rs/tui/src/bottom_pane/chat_composer.rs b/codex-rs/tui/src/bo
 index 56d426bcf0..f0c5cc519a 100644
 --- a/codex-rs/tui/src/bottom_pane/chat_composer.rs
 +++ b/codex-rs/tui/src/bottom_pane/chat_composer.rs
-@@ -396,7 +396,6 @@ use crate::render::Insets;
- use crate::render::RectExt;
- use crate::render::renderable::Renderable;
- use crate::slash_command::SlashCommand;
--use crate::style::user_message_style;
- use crate::ui_consts::FOOTER_INDENT_COLS;
- use codex_protocol::ThreadId;
- use codex_protocol::user_input::ByteRange;
 @@ -4893,8 +4892,13 @@ impl ChatComposer {
              selection.register(status.intersection(buf.area), changed);
              selection.register(footer_rect.intersection(buf.area), changed);

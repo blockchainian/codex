@@ -193,6 +193,9 @@ index 57376049a2..3777985f43 100644
 +                .restore_session_time(session.rollout_path.as_deref())
 +                .unwrap_or_else(|err| tracing::warn!(%err, "session time restore failed"));
 +        }
+         if previous_thread_id != Some(session.thread_id) || self.cloud_picker_selection.is_some() {
+             self.dismiss_stale_model_picker();
+         }
          let connector_scope_changed = previous_thread_id != Some(session.thread_id)
              || self.config.cwd.as_path() != session.cwd.as_path();
          self.thread_id = Some(session.thread_id);
