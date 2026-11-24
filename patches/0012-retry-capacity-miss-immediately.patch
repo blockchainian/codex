@@ -1,108 +1,14 @@
 diff --git a/codex-rs/core/src/responses_retry.rs b/codex-rs/core/src/responses_retry.rs
-index 6a4214609c..5157748be5 100644
+index 79238cb0c7..0943e98ba9 100644
 --- a/codex-rs/core/src/responses_retry.rs
 +++ b/codex-rs/core/src/responses_retry.rs
-@@ -1,6 +1,7 @@
- //! Shared retry and transport fallback decisions for Responses requests.
- //! Content-filter guidance is recorded for sampling requests before retry decisions.
--//! Server advice controls timing without extending configured retry limits.
-+//! Server advice controls timing without extending configured retry limits, except for a
-+//! capacity miss, which is retried at once and without limit.
- 
- use std::time::Duration;
- 
-@@ -33,6 +34,7 @@ pub(crate) struct ResponsesStreamRetryState {
-     retries: u64,
-     connection_retries: u64,
-     connection_retry_delay: Duration,
-+    overloaded_retries: u64,
- }
- 
- impl Default for ResponsesStreamRetryState {
-@@ -41,6 +43,7 @@ impl Default for ResponsesStreamRetryState {
-             retries: 0,
-             connection_retries: 0,
-             connection_retry_delay: INITIAL_CONNECTION_RETRY_DELAY,
-+            overloaded_retries: 0,
-         }
-     }
- }
-@@ -85,6 +88,19 @@ pub(crate) async fn handle_response_stream_error(
+@@ -98,6 +98,9 @@ pub(crate) async fn handle_response_stream_error(
          ResponsesStreamRequest::Sampling => RetryOperation::Sampling,
          ResponsesStreamRequest::RemoteCompactionV2 => RetryOperation::RemoteCompactionV2,
      };
-+    // A capacity miss usually clears on the next attempt, so retry at once: the server's
-+    // advice of several minutes is ignored, and the retry budget is left untouched.
 +    if matches!(err.details(), CodexErrorDetails::ServerOverloaded) {
-+        retry_state.overloaded_retries = retry_state.overloaded_retries.saturating_add(1);
-+        warn!(
-+            turn_id = %turn_context.sub_id,
-+            error = %err,
-+            overloaded_retries = retry_state.overloaded_retries,
-+            "model at capacity; retrying immediately"
-+        );
-+        codex_client::record_retry!(retry_state.overloaded_retries, Duration::ZERO, operation);
 +        return Ok(());
 +    }
      let retry_count = retry_state.retries.saturating_add(1);
      let Some(delay) = err.retry_delay(retry_count) else {
          return Err(err);
-diff --git a/codex-rs/core/src/responses_retry_tests.rs b/codex-rs/core/src/responses_retry_tests.rs
-index 65aa29397c..47e0e37f23 100644
---- a/codex-rs/core/src/responses_retry_tests.rs
-+++ b/codex-rs/core/src/responses_retry_tests.rs
-@@ -98,3 +98,54 @@ async fn stream_retry_preserves_deadline_across_delayed_notification() {
-         "retry resumed at {resumed_at:?}, expected {advice:?}"
-     );
- }
-+
-+/// A capacity miss is retried at once, ignoring the server's advice and the retry budget.
-+#[tokio::test]
-+async fn overloaded_retry_ignores_server_advice_and_retry_budget() {
-+    let (session, turn_context) = make_session_and_context().await;
-+    let step_context = StepContext::for_test(Arc::new(turn_context));
-+    let mut client_session = session.services.model_client.new_session();
-+    let mut retry_state = ResponsesStreamRetryState::default();
-+
-+    tokio::time::pause();
-+    let started_at = Instant::now();
-+    for _ in 0..20 {
-+        let advice = RetryAfter::from_delay(Duration::from_secs(330)).expect("retry deadline");
-+        handle_response_stream_error(
-+            &mut retry_state,
-+            /*max_retries*/ 5,
-+            CodexErr::ServerOverloaded.with_retry_after(advice),
-+            &mut client_session,
-+            &session,
-+            &step_context,
-+            ResponsesStreamRequest::Sampling,
-+        )
-+        .await
-+        .expect("retry should be allowed");
-+    }
-+    assert_eq!(Instant::now(), started_at);
-+    assert_eq!(retry_state.retries, 0);
-+    assert_eq!(retry_state.overloaded_retries, 20);
-+}
-+
-+/// A capacity miss that carries no server advice is retried as well.
-+#[tokio::test]
-+async fn overloaded_retry_without_server_advice_is_allowed() {
-+    let (session, turn_context) = make_session_and_context().await;
-+    let step_context = StepContext::for_test(Arc::new(turn_context));
-+    let mut client_session = session.services.model_client.new_session();
-+    let mut retry_state = ResponsesStreamRetryState::default();
-+
-+    handle_response_stream_error(
-+        &mut retry_state,
-+        /*max_retries*/ 5,
-+        CodexErr::ServerOverloaded,
-+        &mut client_session,
-+        &session,
-+        &step_context,
-+        ResponsesStreamRequest::Sampling,
-+    )
-+    .await
-+    .expect("retry should be allowed");
-+    assert_eq!(retry_state.overloaded_retries, 1);
-+}
