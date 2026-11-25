@@ -1,3 +1,36 @@
+diff --git a/codex-rs/codex-api/src/endpoint/responses_websocket.rs b/codex-rs/codex-api/src/endpoint/responses_websocket.rs
+index 4ced74352d..8cb04af15f 100644
+--- a/codex-rs/codex-api/src/endpoint/responses_websocket.rs
++++ b/codex-rs/codex-api/src/endpoint/responses_websocket.rs
+@@ -440,8 +440,13 @@ impl ResponsesWebsocketConnection {
+                 if let Err(err) = result {
+                     // A terminal stream error should reach the caller immediately. Waiting for a
+                     // graceful close handshake here can stall indefinitely and mask the error.
+-                    drop(guard);
+-                    drop(ws_stream);
++                    if matches!(&err, ApiError::ServerOverloaded { .. }) {
++                        *guard = Some(ws_stream);
++                        drop(guard);
++                    } else {
++                        drop(guard);
++                        drop(ws_stream);
++                    }
+                     // Failed cancellation retires the socket while preserving any received
+                     // completion and its usage for the abandoned classifier's cleanup.
+                     let event = completion.map_or_else(|| Err(err), Ok);
+@@ -811,6 +816,12 @@ fn map_wrapped_websocket_error_event(
+         return None;
+     }
+ 
++    if status == StatusCode::SERVICE_UNAVAILABLE
++        && error.as_ref().and_then(|error| error.code.as_deref()) == Some("server_is_overloaded")
++    {
++        return Some(ApiError::ServerOverloaded { retry_after });
++    }
++
+     Some(ApiError::Transport(TransportError::Http {
+         status,
+         url: None,
 diff --git a/codex-rs/core/src/responses_retry.rs b/codex-rs/core/src/responses_retry.rs
 index 79238cb0c7..0943e98ba9 100644
 --- a/codex-rs/core/src/responses_retry.rs
@@ -12,31 +45,52 @@ index 79238cb0c7..0943e98ba9 100644
      let retry_count = retry_state.retries.saturating_add(1);
      let Some(delay) = err.retry_delay(retry_count) else {
          return Err(err);
-diff --git a/codex-rs/codex-api/src/endpoint/responses_websocket.rs b/codex-rs/codex-api/src/endpoint/responses_websocket.rs
-index 4ced74352d..af57374119 100644
---- a/codex-rs/codex-api/src/endpoint/responses_websocket.rs
-+++ b/codex-rs/codex-api/src/endpoint/responses_websocket.rs
-@@ -438,12 +438,17 @@ impl ResponsesWebsocketConnection {
-                 };
+diff --git a/codex-rs/core/tests/suite/websocket_fallback.rs b/codex-rs/core/tests/suite/websocket_fallback.rs
+index f2d8d494ae..283e4a990a 100644
+--- a/codex-rs/core/tests/suite/websocket_fallback.rs
++++ b/codex-rs/core/tests/suite/websocket_fallback.rs
+@@ -299,3 +299,44 @@ async fn websocket_fallback_is_sticky_across_turns() -> Result<()> {
  
-                 if let Err(err) = result {
--                    // A terminal stream error should reach the caller immediately. Waiting for a
--                    // graceful close handshake here can stall indefinitely and mask the error.
--                    drop(guard);
--                    drop(ws_stream);
--                    // Failed cancellation retires the socket while preserving any received
--                    // completion and its usage for the abandoned classifier's cleanup.
-+                    // Server overload is a request-level failure; keep a healthy socket for retry.
-+                    if matches!(&err, ApiError::ServerOverloaded { .. }) {
-+                        *guard = Some(ws_stream);
-+                    } else {
-+                        // A terminal stream error should reach the caller immediately. Waiting for a
-+                        // graceful close handshake here can stall indefinitely and mask the error.
-+                        drop(guard);
-+                        drop(ws_stream);
-+                        // Failed cancellation retires the socket while preserving any received
-+                        // completion and its usage for the abandoned classifier's cleanup.
-+                    }
-                     let event = completion.map_or_else(|| Err(err), Ok);
-                     let _ = tx_event.send(event).await;
-                 } else {
+     Ok(())
+ }
++
++#[test_case::test_case(false; "failed_response")]
++#[test_case::test_case(true; "wrapped_http_error")]
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn server_overload_retry_reuses_websocket_connection(wrapped: bool) -> Result<()> {
++    skip_if_no_network!(Ok(()));
++    let error = serde_json::json!({
++        "code": "server_is_overloaded",
++        "message": "Selected model is at capacity. Please try a different model."
++    });
++    let overload = if wrapped {
++        serde_json::json!({"type": "error", "status": 503, "error": error})
++    } else {
++        serde_json::json!({"type": "response.failed", "response": {"error": error}})
++    };
++    let server = responses::start_websocket_server(vec![
++        vec![
++            vec![ev_response_created("warm"), ev_completed("warm")],
++            vec![overload.clone()],
++            vec![overload],
++            vec![ev_response_created("ok"), ev_completed("ok")],
++        ],
++        vec![vec![
++            ev_response_created("reconnected"),
++            ev_completed("reconnected"),
++        ]],
++    ])
++    .await;
++    let test = test_codex()
++        .with_config(|config| {
++            config.model_provider.stream_max_retries = Some(0);
++            config.model_provider.request_max_retries = Some(0);
++        })
++        .build_with_websocket_server(&server)
++        .await?;
++    test.submit_turn("hello").await?;
++    assert_eq!(server.connections().len(), 1);
++    assert_eq!(server.single_connection().len(), 4);
++    server.shutdown().await;
++    Ok(())
++}
