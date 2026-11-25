@@ -1,12 +1,20 @@
 diff --git a/codex-rs/core/src/responses_retry.rs b/codex-rs/core/src/responses_retry.rs
-index 79238cb0c7..0943e98ba9 100644
+index 79238cb0c7..c44e7ef720 100644
 --- a/codex-rs/core/src/responses_retry.rs
 +++ b/codex-rs/core/src/responses_retry.rs
-@@ -98,6 +98,9 @@ pub(crate) async fn handle_response_stream_error(
+@@ -98,6 +98,17 @@ pub(crate) async fn handle_response_stream_error(
          ResponsesStreamRequest::Sampling => RetryOperation::Sampling,
          ResponsesStreamRequest::RemoteCompactionV2 => RetryOperation::RemoteCompactionV2,
      };
 +    if matches!(err.details(), CodexErrorDetails::ServerOverloaded) {
++        log_retry(
++            request,
++            turn_context,
++            &err,
++            retry_state.retries.saturating_add(1),
++            max_retries,
++            Duration::ZERO,
++        );
 +        return Ok(());
 +    }
      let retry_count = retry_state.retries.saturating_add(1);
