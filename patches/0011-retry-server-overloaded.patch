@@ -12,3 +12,31 @@ index 79238cb0c7..0943e98ba9 100644
      let retry_count = retry_state.retries.saturating_add(1);
      let Some(delay) = err.retry_delay(retry_count) else {
          return Err(err);
+diff --git a/codex-rs/codex-api/src/endpoint/responses_websocket.rs b/codex-rs/codex-api/src/endpoint/responses_websocket.rs
+index 4ced74352d..af57374119 100644
+--- a/codex-rs/codex-api/src/endpoint/responses_websocket.rs
++++ b/codex-rs/codex-api/src/endpoint/responses_websocket.rs
+@@ -438,12 +438,17 @@ impl ResponsesWebsocketConnection {
+                 };
+ 
+                 if let Err(err) = result {
+-                    // A terminal stream error should reach the caller immediately. Waiting for a
+-                    // graceful close handshake here can stall indefinitely and mask the error.
+-                    drop(guard);
+-                    drop(ws_stream);
+-                    // Failed cancellation retires the socket while preserving any received
+-                    // completion and its usage for the abandoned classifier's cleanup.
++                    // Server overload is a request-level failure; keep a healthy socket for retry.
++                    if matches!(&err, ApiError::ServerOverloaded { .. }) {
++                        *guard = Some(ws_stream);
++                    } else {
++                        // A terminal stream error should reach the caller immediately. Waiting for a
++                        // graceful close handshake here can stall indefinitely and mask the error.
++                        drop(guard);
++                        drop(ws_stream);
++                        // Failed cancellation retires the socket while preserving any received
++                        // completion and its usage for the abandoned classifier's cleanup.
++                    }
+                     let event = completion.map_or_else(|| Err(err), Ok);
+                     let _ = tx_event.send(event).await;
+                 } else {
